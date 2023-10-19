@@ -1,4 +1,4 @@
-use crate::parser::{ParseStore, ParsePos, ParseValue, ParseNode, ParseResult, AllChildrenFailedError, ZSTNode};
+use crate::parser::{ParseStore, ParsePos, ParseValue, ParseNode, ParseResult, AllChildrenFailedError, ZSTNode, Span};
 
 use ParseResult::*;
 use zst::ZST;
@@ -31,6 +31,22 @@ impl <Ok1, Ok2, Err: From<AllChildrenFailedError<Pos, Err, 2>>, Store: ParseStor
         match self.child2.parse(store, pos.clone()) {
             Okay(value) => Okay(AnyOfTwo::Two(value)),
             OkayAdvance(value, advance) => OkayAdvance(AnyOfTwo::Two(value), advance),
+            Error(error2) => Error(AllChildrenFailedError { pos, errors: [error1, error2] }.into()),
+            Panic(error) => Panic(error),
+        }
+    }
+
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+        let error1 = match self.child1.parse_span(store, pos.clone()) {
+            Okay(value) => return Okay(value),
+            OkayAdvance(value, advance) => return OkayAdvance(value, advance),
+            Error(error) => error,
+            Panic(error) => return Panic(error),
+        };
+
+        match self.child2.parse_span(store, pos.clone()) {
+            Okay(value) => Okay(value),
+            OkayAdvance(value, advance) => OkayAdvance(value, advance),
             Error(error2) => Error(AllChildrenFailedError { pos, errors: [error1, error2] }.into()),
             Panic(error) => Panic(error),
         }

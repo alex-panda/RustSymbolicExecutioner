@@ -1,6 +1,6 @@
-use std::{rc::Rc, collections::HashSet};
+use std::rc::Rc;
 
-use super::{ParseResult, Span, ZeroOrMore, ParseNode, FailedFirstParseError, FailedMatchError, NoAdvanceError, NoReturnValueError, UnexpectedSuccessError, OneOfTwo, SpanOf, Map, ValueSet, OneOfThree, OneOrMore, Spanned};
+use super::{ParseResult, Span, ZeroOrMore, ParseNode, OneOfTwo, SpanOf, Map, OneOfThree, Spanned};
 
 
 #[derive(PartialEq)]

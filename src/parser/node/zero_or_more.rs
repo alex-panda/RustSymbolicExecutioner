@@ -1,4 +1,4 @@
-use crate::parser::ZSTNode;
+use crate::parser::{ZSTNode, Span};
 
 use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult, NoAdvanceError};
 
@@ -28,6 +28,21 @@ impl <Ok, Err: From<NoAdvanceError<Pos>>, Store: ParseStore<Pos, V>, Pos: ParseP
                     pos = advance;
                 },
                 Error(_) => return OkayAdvance(accume, pos),
+                Panic(err) => return Panic(err),
+            }
+        }
+    }
+
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<crate::parser::Span<Pos>, Err, Pos> {
+        let mut curr_pos = pos.clone();
+        loop {
+            match self.child.parse_span(store, curr_pos.clone()) {
+                Okay(_) => return Panic(NoAdvanceError { pos }.into()),
+                OkayAdvance(_, advance) => {
+                    if pos.key() == advance.key() { return Panic(NoAdvanceError { pos }.into()); }
+                    curr_pos = advance;
+                },
+                Error(_) => return OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos),
                 Panic(err) => return Panic(err),
             }
         }

@@ -24,4 +24,8 @@ impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: P
             Panic(error) => Panic(error),
         }
     }
+
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+        self.child.parse_span(store, pos)
+    }
 }

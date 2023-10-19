@@ -1,4 +1,4 @@
-use crate::parser::ZSTNode;
+use crate::parser::{ZSTNode, Span};
 
 use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult};
 
@@ -20,6 +20,15 @@ impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: P
         match self.child.parse(store, pos.clone()) {
             Okay(value) => Okay(value),
             OkayAdvance(value, _) => Okay(value),
+            Error(error) => Error(error),
+            Panic(error) => Panic(error),
+        }
+    }
+    
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+        match self.child.parse_span(store, pos.clone()) {
+            Okay(_) => Okay(Span::new(pos.clone(), pos)),
+            OkayAdvance(_, advance) => Okay(Span::new(pos, advance)),
             Error(error) => Error(error),
             Panic(error) => Panic(error),
         }

@@ -10,4 +10,11 @@ impl <Ok, Err: From<RwLockReadError>, Store: ParseStore<Pos, V>, Pos: ParsePos, 
             Err(_) => ParseResult::Panic(RwLockReadError.into()),
         }
     }
+    
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<crate::parser::Span<Pos>, Err, Pos> {
+        match self.read() {
+            Ok(child_ref) => child_ref.parse_span(store, pos),
+            Err(_) => ParseResult::Panic(RwLockReadError.into()),
+        }
+    }
 }

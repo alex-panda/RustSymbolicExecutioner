@@ -10,4 +10,11 @@ impl <Ok, Err: From<RefCellReadError>, Store: ParseStore<Pos, V>, Pos: ParsePos,
             Err(_) => ParseResult::Panic(RefCellReadError.into()),
         }
     }
+
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<crate::parser::Span<Pos>, Err, Pos> {
+        match self.try_borrow() {
+            Ok(reference) => reference.parse_span(store, pos),
+            Err(_) => ParseResult::Panic(RefCellReadError.into()),
+        }
+    }
 }

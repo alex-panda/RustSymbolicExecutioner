@@ -16,7 +16,7 @@ pub struct ValueSetNode<Ok, Err: From<ValueOutsideSetError<Pos, V, N>> + From<Un
 }
 
 impl <Ok, Err: From<ValueOutsideSetError<Pos, V, N>> + From<UnexpectedEndError<Pos>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, const N: usize> ParseNode<V, Err, Store, Pos, V> for ValueSetNode<Ok, Err, Store, Pos, V, N> {
-    fn parse(&self, store: &Store, mut pos: Pos) -> ParseResult<V, Err, Pos> {
+    fn parse(&self, store: &Store, pos: Pos) -> ParseResult<V, Err, Pos> {
         let mut new_pos = pos.clone();
 
         // get the value at the current position

@@ -1,4 +1,4 @@
-use crate::parser::ZSTNode;
+use crate::parser::{ZSTNode, Span};
 
 use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult, NoAdvanceError, FailedFirstParseError};
 
@@ -42,6 +42,34 @@ impl <Ok, Err: From<NoAdvanceError<Pos>> + From<FailedFirstParseError<Pos, Err>>
                 },
                 Error(_) => return OkayAdvance(accume, pos),
                 Panic(err) => return Panic(err),
+            }
+        }
+    }
+
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+        let mut curr_pos = pos.clone();
+
+        // try first parse
+        match self.child.parse_span(store, curr_pos.clone()) {
+            Okay(_) => return Panic(NoAdvanceError { pos }.into()),
+            OkayAdvance(_, advance) => {
+                if curr_pos.key() == advance.key() { return Panic(NoAdvanceError { pos }.into()) }
+                curr_pos = advance
+            },
+            Error(cause) => return Error(FailedFirstParseError { pos, cause }.into()),
+            Panic(error) => return Panic(error),
+        }
+
+        // try all subsequent parses
+        loop {
+            match self.child.parse_span(store, curr_pos.clone()) {
+                Okay(_) => return Panic(NoAdvanceError { pos }.into()),
+                OkayAdvance(_, advance) => {
+                    if curr_pos.key() == advance.key() { return Panic(NoAdvanceError { pos }.into()) }
+                    curr_pos = advance
+                },
+                Error(_) => return OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos),
+                Panic(error) => return Panic(error),
             }
         }
     }

@@ -1,4 +1,4 @@
-use crate::parser::ZSTNode;
+use crate::parser::{ZSTNode, Span};
 
 use super::super::{ParseStore, ParsePos, ParseValue, ParseNode, ParseResult};
 
@@ -17,10 +17,19 @@ use ParseResult::*;
 impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Option<Ok>, Err, Store, Pos, V> for MaybeNode<Child, Ok, Err, Store, Pos, V> {
     fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Option<Ok>, Err, Pos> {
         match self.child.parse(store, pos) {
-            ParseResult::Okay(value) => Okay(Some(value)),
-            ParseResult::OkayAdvance(value, advance) => OkayAdvance(Some(value), advance),
-            ParseResult::Error(_) => Okay(None),
-            ParseResult::Panic(error) => Panic(error),
+            Okay(value) => Okay(Some(value)),
+            OkayAdvance(value, advance) => OkayAdvance(Some(value), advance),
+            Error(_) => Okay(None),
+            Panic(error) => Panic(error),
+        }
+    }
+
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+        match self.child.parse_span(store, pos.clone()) {
+            Okay(_) => Okay(Span::new(pos.clone(), pos)),
+            OkayAdvance(_, advance) => OkayAdvance(Span::new(pos, advance.clone()), advance),
+            Error(_) => Okay(Span::new(pos.clone(), pos)),
+            Panic(error) => Panic(error),
         }
     }
 }

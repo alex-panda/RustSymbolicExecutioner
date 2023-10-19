@@ -7,4 +7,8 @@ impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: ?
     fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Ok, Err, Pos> {
         self.as_ref().parse(store, pos)
     }
+
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<crate::parser::Span<Pos>, Err, Pos> {
+        self.as_ref().parse_span(store, pos)
+    }
 }
