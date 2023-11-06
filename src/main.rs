@@ -1,5 +1,6 @@
 mod parser;
 mod compiler;
+mod solver;
 
 use std::env;
 
@@ -14,6 +15,7 @@ fn main() {
     let valid = compiler::compile_input(&args[1]);
     if valid {
         println!("Hello World!");
+        solver::solver_example().unwrap();
     }
 
     else {

@@ -12,3 +12,8 @@ Cargo.lock
 
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
+
+#Remove z3 executable files
+z3/bin/
+z3/include/
+z3/LICENSE.txt
