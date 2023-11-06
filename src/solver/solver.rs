@@ -10,7 +10,7 @@ pub fn solver_example() -> Result<(), Box<dyn std::error::Error>> {
 
     while i < arg_vec.len() {
         int_vec.push(Int::from_name(arg_vec[i]));
-        solver.assert(int_vec[i]._neq(1))?;
+        solver.assert(int_vec[i]._neq(i64::try_from(i).unwrap() + 1))?;
         i = i + 1;
     }
 
