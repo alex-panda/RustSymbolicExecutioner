@@ -6,3 +6,7 @@ Setup instructions (Windows):
   - Extract the files
   - Move the directory containing /bin and /include to your project directory
   - Rename that directory to z3
+
+How to run:
+  - cargo run -- <path to a .rs program file>
+  - The file must include fn main()
