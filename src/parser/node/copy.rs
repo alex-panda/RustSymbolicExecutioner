@@ -1,18 +1,18 @@
-use super::super::{ParseStore, ParsePos, ParseNode, ParseResult, UnexpectedValueError, UnexpectedEndError};
+use super::super::{ParseStore, ParsePos, ParseNode, ParseResult, UnexpectedValueError, UnexpectedEndError, Span};
 
 use ParseResult::*;
 
 macro_rules! value {
     ($t: ident) => {
-        impl <Err: From<UnexpectedValueError<Pos, $t>> + From<UnexpectedEndError<Pos>>, Store: ParseStore<Pos, $t>, Pos: ParsePos> ParseNode<$t, Err, Store, Pos, $t> for $t {
-            fn parse(&self, store: &Store, pos: Pos) -> ParseResult<$t, Err, Pos> {
+        impl <Err: From<UnexpectedValueError<Pos, $t>> + From<UnexpectedEndError<Pos>>, Store: ParseStore<Pos, $t>, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, $t> for $t {
+            fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
                 let mut curr_pos = pos.clone();
                 match store.value_at(&mut curr_pos) {
-                    Some($t) => {
-                        if $t == *self {
-                            OkayAdvance($t, curr_pos)
+                    Some(value) => {
+                        if value == *self {
+                            OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
                         } else {
-                            Error(UnexpectedValueError { pos, found: $t, expected: *self }.into())
+                            Error(UnexpectedValueError { pos, found: value, expected: *self }.into())
                         }
                     },
                     None => Error(UnexpectedEndError { pos }.into()),
@@ -37,4 +37,8 @@ value!(isize);
 value!(i128);
 
 value!(char);
+
+value!(f32);
+value!(f64);
+
 

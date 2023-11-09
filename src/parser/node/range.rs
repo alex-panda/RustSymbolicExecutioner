@@ -1,15 +1,13 @@
 use std::ops::{RangeBounds, Bound, RangeTo, RangeFull, RangeFrom, Range, RangeToInclusive, RangeInclusive};
 
-use crate::parser::{UnexpectedEndError, ValueOutsideRangeError};
-
-use super::super::{ParseNode, ParsePos, ParseStore, ParseResult};
+use super::super::{ParseNode, ParsePos, ParseStore, ParseResult, Span, UnexpectedEndError, ValueOutsideRangeError};
 
 use ParseResult::*;
 
 macro_rules! impl_range {
     ($rangeboundtype: ty, $t: ty) => {
-        impl <Err: From<UnexpectedEndError<Pos>> + From<ValueOutsideRangeError<Pos, $t>>, Store: ParseStore<Pos, $t>, Pos: ParsePos> ParseNode<$t, Err, Store, Pos, $t> for $rangeboundtype {
-            fn parse(&self, store: &Store, pos: Pos) -> ParseResult<$t, Err, Pos> {
+        impl <Err: From<UnexpectedEndError<Pos>> + From<ValueOutsideRangeError<Pos, $t>>, Store: ParseStore<Pos, $t>, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, $t> for $rangeboundtype {
+            fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
                 let mut curr_pos = pos.clone();
 
                 match store.value_at(&mut curr_pos) {
@@ -17,7 +15,7 @@ macro_rules! impl_range {
                         if !self.contains(&actual_char) {
                             Error(ValueOutsideRangeError { pos, found: actual_char, range_start: self.start_bound().cloned(), range_end: self.end_bound().cloned() }.into())
                         } else {
-                            OkayAdvance(actual_char, curr_pos)
+                            OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
                         }
                     },
                     None => Error(UnexpectedEndError { pos: curr_pos }.into()),
@@ -137,8 +135,8 @@ impl_range!(RangeToInclusive<f64>, f64);
 
 macro_rules! impl_u32_range_for_char {
     ($rangeboundtype: ty) => {
-        impl <Err: From<UnexpectedEndError<Pos>> + From<ValueOutsideRangeError<Pos, u32>>, Store: ParseStore<Pos, char>, Pos: ParsePos> ParseNode<char, Err, Store, Pos, char> for $rangeboundtype {
-            fn parse(&self, store: &Store, pos: Pos) -> ParseResult<char, Err, Pos> {
+        impl <Err: From<UnexpectedEndError<Pos>> + From<ValueOutsideRangeError<Pos, u32>>, Store: ParseStore<Pos, char>, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, char> for $rangeboundtype {
+            fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
                 let mut curr_pos = pos.clone();
 
                 match store.value_at(&mut curr_pos) {
@@ -146,7 +144,7 @@ macro_rules! impl_u32_range_for_char {
                         if !self.contains(&(actual_char as u32)) {
                             Error(ValueOutsideRangeError { pos, found: actual_char as u32, range_start: self.start_bound().cloned(), range_end: self.end_bound().cloned() }.into())
                         } else {
-                            OkayAdvance(actual_char, curr_pos)
+                            OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
                         }
                     },
                     None => Error(UnexpectedEndError { pos: curr_pos }.into()),
