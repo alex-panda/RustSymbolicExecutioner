@@ -20,3 +20,34 @@ pub trait ParseNode<Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseV
         }
     }
 }
+
+
+impl <'a, Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<Ok, Err, Store, Pos, V> for &'a dyn ParseNode<Ok, Err, Store, Pos, V> {
+    fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Ok, Err, Pos> {
+        (**self).parse(store, pos)
+    }
+
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+        (**self).parse_span(store, pos)
+    }
+}
+
+impl <'a, Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<Ok, Err, Store, Pos, V> for &'a mut dyn ParseNode<Ok, Err, Store, Pos, V> {
+    fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Ok, Err, Pos> {
+        (**self).parse(store, pos)
+    }
+
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+        (**self).parse_span(store, pos)
+    }
+}
+
+impl <'a, Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Ok, Err, Store, Pos, V> for &'a Child {
+    fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Ok, Err, Pos> {
+        (**self).parse(store, pos)
+    }
+
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<crate::parser::Span<Pos>, Err, Pos> {
+        (**self).parse_span(store, pos)
+    }
+}

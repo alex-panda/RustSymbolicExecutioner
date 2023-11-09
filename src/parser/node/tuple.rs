@@ -1,16 +1,18 @@
-use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult};
+use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult, Span};
 use paste::paste;
 
 use ParseResult::*;
 
 macro_rules! handle_result {
     ($res: expr, $pos: expr) => {
+        {
             match $res {
-                ParseResult::Okay(v1) => v1,
+                ParseResult::Okay(v1) => { v1 },
                 ParseResult::OkayAdvance(v1, new_pos) => { $pos = new_pos; v1 },
-                ParseResult::Error(err) => return Error(err),
-                ParseResult::Panic(err) => return Panic(err),
+                ParseResult::Error(err) => { return Error(err) },
+                ParseResult::Panic(err) => { return Panic(err) },
             }
+        }
     };
 }
 
@@ -41,6 +43,15 @@ macro_rules! impl_tuple {
                         handle_result!(self.0.parse(store, pos.clone()), pos),
                         $(handle_result!(self.$num.parse(store, pos.clone()), pos),)*
                     ), pos)
+                }
+
+                fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+                    let mut curr_pos = pos.clone();
+
+                    handle_result!(self.0.parse(store, pos.clone()), curr_pos);
+                    $(handle_result!(self.$num.parse(store, pos.clone()), curr_pos);)*
+
+                    OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
                 }
             }
         }
