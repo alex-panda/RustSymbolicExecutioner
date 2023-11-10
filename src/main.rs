@@ -3,7 +3,7 @@ mod compiler;
 mod solver;
 
 use std::env;
-use equation_solver::*;
+//use equation_solver::*;
 use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
 use crate::solver::{SymVar, SymExEngine};
 
@@ -23,23 +23,21 @@ fn main() {
             sigma: Vec::new(),
             path: "".to_string(),
         };
-        Ok(())
-    };
 
-    if let Err(_err) = init_engine() {
-        println!("Failed to initialize symbolic execution engine.");
-    }
-
-    else {
-       let valid = compiler::compile_input(&args[1]);
+        let valid = compiler::compile_input(&args[1]);
         if valid {
             println!("Hello World!");
-            solver::solver_example().unwrap();
+            solver::solver_example(&mut engine.pi).unwrap();
             solver::demo_eval();
         }
 
         else {
             println!("Could not compile");
         }
+        Ok(())
+    };
+
+    if let Err(_err) = init_engine() {
+        println!("Failed to initialize symbolic execution engine.");
     }
 }
