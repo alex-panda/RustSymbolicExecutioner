@@ -27,7 +27,8 @@ fn main() {
         let valid = compiler::compile_input(&args[1]);
         if valid {
             println!("Hello World!");
-            solver::solver_example(&mut engine.pi).unwrap();
+            solver::test_symex(engine);
+            //solver::solver_example(&mut engine.pi).unwrap();
             solver::demo_eval();
         }
 
