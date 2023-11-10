@@ -1,15 +1,23 @@
 use equation_solver::*;
-
+use smtlib::{backend::Z3Binary, Solver};
 pub struct SymVar {
     pub name: String,
     pub var0: String,
-    pub current_eq: Equation,
+    pub prev: String,
 }
 
-pub fn update_assignment(var: SymVar, stmt: String) {
-    let n = Equation::new("8*((2 + 4) + 5)");
+pub struct SymExEngine {
+    pub pi: Solver<Z3Binary>,
+    pub pi_str: String,
+    pub sigma: Vec<SymVar>,
+    pub path: String,
+}
 
-    let eq1 = n.unwrap();
+pub fn demo_eval() {
+    let n = Equation::new("x*((2 + 4) + 5)");
+
+    let mut eq1 = n.unwrap();
+    Equation::set_value(&mut eq1, "x", 8.into());
 
     let t = eq1.evaluate();
 

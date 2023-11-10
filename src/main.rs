@@ -4,8 +4,10 @@ mod solver;
 
 use std::env;
 use equation_solver::*;
-use crate::solver::SymVar;
+use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
+use crate::solver::{SymVar, SymExEngine};
 
+static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
@@ -14,22 +16,30 @@ fn main() {
     }
     println!("{}", &args[1]);
 
-    let n = Equation::new("8");
-
-    let mut v = SymVar {
-        name: "v".to_string(),
-        var0: "v + 5".to_string(),
-        current_eq: n.unwrap(),
+    let init_engine = || -> Result<(), Box<dyn std::error::Error>> {
+        let mut engine = SymExEngine {
+            pi: Solver::new(Z3Binary::new(PATH_TO_SOLVER)?)?,
+            pi_str: "".to_string(),
+            sigma: Vec::new(),
+            path: "".to_string(),
+        };
+        Ok(())
     };
 
-    let valid = compiler::compile_input(&args[1]);
-    if valid {
-        println!("Hello World!");
-        solver::solver_example().unwrap();
-        solver::update_assignment(v, "v = x + 5".to_string());
+    if let Err(_err) = init_engine() {
+        println!("Failed to initialize symbolic execution engine.");
     }
 
     else {
-        println!("Could not compile");
+       let valid = compiler::compile_input(&args[1]);
+        if valid {
+            println!("Hello World!");
+            solver::solver_example().unwrap();
+            solver::demo_eval();
+        }
+
+        else {
+            println!("Could not compile");
+        }
     }
 }
