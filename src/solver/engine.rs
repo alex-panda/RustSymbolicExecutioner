@@ -20,22 +20,31 @@ pub fn demo_eval() {
     println!("{t:?}");
 }
 
+//demonstration of updating sigma using predetermined variables and assignments
 pub fn test_symex(mut e: SymExEngine) -> SymExEngine {
-    e = new_variable(e, "x".to_string());
-    e = new_variable(e, "y".to_string());
+    e = new_variable(e, "x".to_string(), "i32".to_string());
+    e = new_variable(e, "y".to_string(), "u64".to_string());
     e = update_symvar_value(e, "y + 4".to_string(), "x".to_string());
     e = update_symvar_value(e, "2*x".to_string(), "y".to_string());
 
     return e;
 }
 
-//Symbolic let
-pub fn new_variable(mut e: SymExEngine, var: String) -> SymExEngine {
-    let v = SymVar::new(var, "i32".to_string());
+//creates symvar from function header
+//ie (mut var_name: var_type)
+pub fn new_variable(mut e: SymExEngine, var_name: String, var_type: String) -> SymExEngine {
+    let v = SymVar::new(var_name, var_type);
     e.sigma.push(v);
     return e;
 }
 
+//creates symvar from initialization
+//ie let var_name: var_type = assign;
+pub fn new_variable_assign(mut e: SymExEngine, var_name: String, var_type: String, assign: String) -> SymExEngine {
+    let v = SymVar::new_assign(var_name, var_type, assign);
+    e.sigma.push(v);
+    return e;
+}
 
 pub fn update_symvar_value(mut e: SymExEngine, mut stmt_rs: String, stmt_ls: String) -> SymExEngine {
     let mut i = 0;

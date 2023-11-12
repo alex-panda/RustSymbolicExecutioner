@@ -9,9 +9,11 @@ fn a(mut x:i32, mut y:i32) {
     x = y + 4;
     y = 2*x; 
     //symex
-
-    //expected: pi: true;
-    //sigma: x = y + 4, y = 2*(y + 4)
+    
+    //expected: 
     //path: 1
+    //pi: true;
+    //sigma: x = y + 4, y = 2*(y + 4)
+    //
 
 }
