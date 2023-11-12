@@ -6,10 +6,12 @@ fn main() {
 }
 
 fn a(mut x:i32, mut y:i32) {
-    x = 8;
-    if x > 5 {
-        y = x + 6;
-    }
+    x = y + 4;
+    y = 2*x; 
+    //symex
 
+    //expected: pi: true;
+    //sigma: x = y + 4, y = 2*(y + 4)
+    //path: 1
 
 }

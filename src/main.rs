@@ -10,6 +10,7 @@ use crate::solver::{SymVar, SymExEngine};
 static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
 fn main() {
     let args: Vec<String> = env::args().collect();
+    let mut num_paths = 1;
     if args.len() != 2 {
         println!("File name expected");
         return;
@@ -19,17 +20,18 @@ fn main() {
     let init_engine = || -> Result<(), Box<dyn std::error::Error>> {
         let mut engine = SymExEngine {
             pi: Solver::new(Z3Binary::new(PATH_TO_SOLVER)?)?,
-            pi_str: "".to_string(),
+            pi_str: "true".to_string(),
             sigma: Vec::new(),
-            path: "".to_string(),
+            path: num_paths,
         };
 
         let valid = compiler::compile_input(&args[1]);
         if valid {
-            println!("Hello World!");
-            solver::test_symex(engine);
+            //println!("Hello World!");
+            engine = solver::test_symex(engine);
+            println!("{}", engine.to_string());
             //solver::solver_example(&mut engine.pi).unwrap();
-            solver::demo_eval();
+            //solver::demo_eval();
         }
 
         else {
