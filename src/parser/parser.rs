@@ -1,22 +1,18 @@
-use std::cell::RefCell;
-
-use crate::parser::AnyOfSix;
-
-use super::{ParseResult, Span, ZeroOrMore, ParseNode, OneOfTwo, SpanOf, Map, OneOfThree, Spanned, OneOrMore, AnyOfThree, Maybe, AnyOfTwo, MapV, OneOfSix, OneOfFour, AnyOfFour, Dyn, SRule};
+use super::{AnyOfSix, ParseResult, Span, ZeroOrMore, ParseNode, OneOfTwo, SpanOf, Map, OneOfThree, Spanned, OneOrMore, AnyOfThree, Maybe, AnyOfTwo, MapV, OneOfSix, OneOfFour, AnyOfFour, Dyn, SRule};
 
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Arg {
     pub id: Span<usize>,
     pub ty: Span<usize>,
 }
 
-#[derive(PartialEq, Clone)]
-pub struct FuncBody {
-
+#[derive(Debug, PartialEq, Clone)]
+pub struct Group {
+    statements: Vec<Statement>
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Type {
     /// The name of the type.
     name: Span<usize>,
@@ -24,10 +20,11 @@ pub struct Type {
     args: Vec<Self>,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     Int(Integer),
     Float(Float),
+    Group(Group),
     Add(Box<Expr>, Span<usize>, Box<Expr>),
     Sub(Box<Expr>, Span<usize>, Box<Expr>),
     Div(Box<Expr>, Span<usize>, Box<Expr>),
@@ -35,7 +32,7 @@ pub enum Expr {
     Pow(Box<Expr>, Span<usize>, Box<Expr>),
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     /// An expression with an optional semicolon after it (semicolon can only be omitted if it is at the end of a group).
     Expr {
@@ -70,7 +67,7 @@ pub enum Statement {
     },
 }
 
-#[derive(Eq, Clone)]
+#[derive(Debug, Eq, Clone)]
 pub enum FloatType {
     F32(Span<usize>),
     F64(Span<usize>),
@@ -86,7 +83,7 @@ impl PartialEq for FloatType {
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum UntType {
     U8,
     U16,
@@ -96,7 +93,7 @@ pub enum UntType {
     USize,
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum IntType {
     I8,
     I16,
@@ -106,7 +103,7 @@ pub enum IntType {
     ISize,
 }
 
-#[derive(Eq, Clone)]
+#[derive(Debug, Eq, Clone)]
 pub enum IntegerType {
     /// Integer was specified to have a signed type.
     Signed(Span<usize>, IntType),
@@ -124,13 +121,13 @@ impl PartialEq for IntegerType {
     }
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Sign {
     Positive,
     Negative,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Integer {
     /// The span of the entire integer (including its sign and type (if either are given)).
     pub span: Span<usize>,
@@ -144,7 +141,7 @@ pub struct Integer {
     pub ty: Option<IntegerType>,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Float {
     /// The span of the entire float.
     pub span: Span<usize>,
@@ -158,7 +155,7 @@ pub struct Float {
     pub ty: Option<FloatType>,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ReturnType {
     /// Returns the given type.
     Type(Span<usize>),
@@ -166,16 +163,16 @@ pub enum ReturnType {
     Never,
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Func {
     pub span: Span<usize>,
-    pub fn_: Span<usize>,
+    pub fn_span: Span<usize>,
     pub id: Span<usize>,
     pub args: Vec<Arg>,
-    pub body: FuncBody,
+    pub body: Group,
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct File {
     pub funcs: Vec<Func>,
 }
@@ -351,12 +348,17 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
         }
     );
 
+
     // create `expr` (it requires a number of recursive child nodes)
+    let group = SRule();
     let expr = SRule();
     let value = SRule();
     let power = SRule();
     let mul_or_div = SRule();
     let add_or_sub = SRule();
+    let ty = SRule();
+    let statement = SRule();
+
     {
         expr.set(
             MapV(
@@ -365,43 +367,6 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
                     match add_or_sub {
                         AnyOfTwo::Child1(span) => Expr::Add(Box::new(value), span, Box::new(expr)),
                         AnyOfTwo::Child2(span) => Expr::Sub(Box::new(value), span, Box::new(expr)),
-                    }
-                }
-            )
-        );
-
-        value.set(
-            MapV(
-                OneOfThree(
-                    &integer,
-                    &float,
-                    ('(', &w, Dyn(&expr), &w, ')')
-                ),
-                |res| {
-                    match res {
-                        AnyOfThree::Child1(int) => Expr::Int(int),
-                        AnyOfThree::Child2(float) => Expr::Float(float),
-                        AnyOfThree::Child3((_oparen, _, expr, _, _cparen)) => expr,
-                    }
-                }
-            )
-        );
-
-        power.set(
-            MapV(
-                (&value, &w, '^', &w, Dyn(&power)),
-                |(value, _, pow, _, expr)| {
-                Expr::Pow(Box::new(value), pow, Box::new(expr))
-            })
-        );
-
-        mul_or_div.set(
-            MapV(
-                (Dyn(&power), &w, OneOfTwo('*', '/'), &w, Dyn(&mul_or_div)),
-                |(value, _, mul_or_div, _, expr)| {
-                    match mul_or_div {
-                        AnyOfTwo::Child1(span) => Expr::Mul(Box::new(value), span, Box::new(expr)),
-                        AnyOfTwo::Child2(span) => Expr::Div(Box::new(value), span, Box::new(expr)),
                     }
                 }
             )
@@ -418,9 +383,58 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
                 }
             )
         );
+
+        mul_or_div.set(
+            MapV(
+                (&power, &w, OneOfTwo('*', '/'), &w, Dyn(&mul_or_div)),
+                |(value, _, mul_or_div, _, expr)| {
+                    match mul_or_div {
+                        AnyOfTwo::Child1(span) => Expr::Mul(Box::new(value), span, Box::new(expr)),
+                        AnyOfTwo::Child2(span) => Expr::Div(Box::new(value), span, Box::new(expr)),
+                    }
+                }
+            )
+        );
+
+        power.set(
+            MapV(
+                (&value, &w, '^', &w, Dyn(&power)),
+                |(value, _, pow, _, expr)| {
+                Expr::Pow(Box::new(value), pow, Box::new(expr))
+            })
+        );
+
+        value.set(
+            MapV(
+                OneOfFour(
+                    &integer,
+                    &float,
+                    ('(', &w, Dyn(&expr), &w, ')'),
+                    &group
+                ),
+                |res| {
+                    match res {
+                        AnyOfFour::Child1(int) => Expr::Int(int),
+                        AnyOfFour::Child2(float) => Expr::Float(float),
+                        AnyOfFour::Child3((_oparen, _, expr, _, _cparen)) => expr,
+                        AnyOfFour::Child4(group) => Expr::Group(group),
+                    }
+                }
+            )
+        );
     }
 
-    let ty = SRule();
+    group.set(
+        MapV(
+            ('{', &w, ZeroOrMore((Dyn(&statement), &w)), '}'),
+            |(_lcbrace, _, statements, _rcbrace)| {
+                Group {
+                    statements: statements.into_iter().map(|v|v.0).collect(),
+                }
+            }
+        )
+    );
+
     ty.set(
         MapV(
             (
@@ -447,7 +461,7 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
         )
     );
 
-    let statement = Some(
+    statement.set(
         MapV(
             OneOfFour(
                 ("return", &w, &expr, Maybe((&w, ';'))),
@@ -508,10 +522,10 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
             |(span, (f, _, ident, _, oparen, _, params, _, cparen, _, ret_type, _, ocbrace, _, statements, _, ccbrace))| {
                 Func {
                     span,
-                    fn_: f,
+                    fn_span: f,
                     id: ident,
                     args: Vec::new(),
-                    body: FuncBody { },
+                    body: Group { statements },
                 }
             }
         );
@@ -520,9 +534,11 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
     let file_rule = 
         Map(
             ZeroOrMore((&w, &func_rule, &w)),
-            |_: ParseResult<Vec<(Span<usize>, Func, Span<usize>)>, String, usize>| {
-                Okay(File {
-                    funcs: Vec::new(),
+            |res: ParseResult<Vec<(Span<usize>, Func, Span<usize>)>, String, usize>| {
+                res.map_value(|v| {
+                    File {
+                        funcs: v.into_iter().map(|v|v.1).collect(),
+                    }
                 })
             }
         );
@@ -533,11 +549,25 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::parser::File;
+    use crate::parser::parser::{File, Func};
 
     use super::parse_file;
     use super::super::ParseResult;
     use ParseResult::*;
+
+    #[test]
+    fn test_empty_fn() {
+        match parse_file(" \t  fn \t hello {} \t \r") {
+            Okay(value) => {
+                print!("{:?}", value)
+            },
+            OkayAdvance(value, advance) => {
+                print!("{:?} {:?}", value, advance)
+            },
+            Error(error) => panic!("Error: {}", error),
+            Panic(error) => panic!("Panic: {}", error),
+        }
+    }
 
     #[test]
     fn test_empty() {

@@ -2,7 +2,13 @@ use crate::parser::{ZSTNode, Span};
 
 use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult, UnexpectedSuccessError};
 
-
+///
+/// A negative lookahead node i.e. a node that only parses successfully if the
+/// given child node fails to parse. It will return `ParseResult::Okay(())`
+/// when the child failst to parse and
+/// `ParseResult::Error(UnexpectedSuccessError.into())` when the child node
+/// parses successfully.
+/// 
 #[allow(non_snake_case)]
 pub fn Not<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: From<UnexpectedSuccessError<Pos>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>(child: Child) -> NotNode<Child, Ok, Err, Store, Pos, V> {
     NotNode { child, _zst: ZSTNode::default() }

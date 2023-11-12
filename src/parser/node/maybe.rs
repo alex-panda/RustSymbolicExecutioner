@@ -2,6 +2,12 @@ use crate::parser::{ZSTNode, Span};
 
 use super::super::{ParseStore, ParsePos, ParseValue, ParseNode, ParseResult};
 
+/// 
+/// Returns a node that will map every `ParseResult::Error` that the child node
+/// parses into `ParseResult::Okay(None)`, every `ParseResult::Okay(Ok)` into
+/// `ParseResult::Okay(Some(Ok))`, and every `ParseResult::OkayAdvance(Ok, Pos)` into
+/// `ParseResult::OkayAdvance(Some(Ok), Pos)`.
+/// 
 #[allow(non_snake_case)]
 pub fn Maybe<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>(child: Child) -> MaybeNode<Child, Ok, Err, Store, Pos, V> {
     MaybeNode { child, zst: ZSTNode::default() }

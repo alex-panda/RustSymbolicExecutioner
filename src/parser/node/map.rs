@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use zst::ZST;
 
 use crate::parser::ZSTNode;

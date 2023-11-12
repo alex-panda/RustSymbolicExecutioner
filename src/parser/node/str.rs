@@ -3,7 +3,7 @@ use crate::parser::{Span, UnexpectedEndError, UnexpectedValueError};
 use super::super::{ParseNode, ParsePos, ParseStore, ParseResult};
 
 use ParseResult::*;
-impl <Err: From<UnexpectedEndError<Pos>> + From<UnexpectedValueError<Pos, char>>, Store: ParseStore<Pos, char>, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, char> for &str {
+impl <Err: From<UnexpectedEndError<Pos>> + From<UnexpectedValueError<Pos, char>>, Store: ParseStore<Pos, char>, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, char> for str {
     fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
         let mut curr_pos = pos.clone();
         for target_char in self.chars() {
