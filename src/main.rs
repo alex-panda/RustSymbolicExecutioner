@@ -1,17 +1,35 @@
 mod parser;
+mod compiler;
+mod solver;
+
+use std::env;
+use equation_solver::*;
+use crate::solver::SymVar;
 
 fn main() {
-    // can do complicated setup code
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 2 {
+        println!("File name expected");
+        return;
+    }
+    println!("{}", &args[1]);
 
-    // then call the start function
-    start(3, 4);
-}
+    let n = Equation::new("8");
 
-fn start(mut x: u32, y: u32) {
-    if x > 3 {
-        x -= 2;
+    let mut v = SymVar {
+        name: "v".to_string(),
+        var0: "v + 5".to_string(),
+        current_eq: n.unwrap(),
+    };
+
+    let valid = compiler::compile_input(&args[1]);
+    if valid {
+        println!("Hello World!");
+        solver::solver_example().unwrap();
+        solver::update_assignment(v, "v = x + 5".to_string());
     }
 
-    // symex:check x == 1..3, y > 2
+    else {
+        println!("Could not compile");
+    }
 }
-
