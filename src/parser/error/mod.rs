@@ -1,3 +1,6 @@
+mod expected_end_error;
+pub use expected_end_error::*;
+
 mod value_outside_set_error;
 pub use value_outside_set_error::*;
 

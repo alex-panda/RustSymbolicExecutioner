@@ -1,10 +1,10 @@
-use super::{AnyOfSix, ParseResult, Span, ZeroOrMore, ParseNode, OneOfTwo, SpanOf, Map, OneOfThree, Spanned, OneOrMore, AnyOfThree, Maybe, AnyOfTwo, MapV, OneOfSix, OneOfFour, AnyOfFour, Dyn, SRule};
+use super::{AnyOfSix, ParseResult, Span, ZeroOrMore, ParseNode, OneOfTwo, SpanOf, Map, OneOfThree, Spanned, OneOrMore, AnyOfThree, Maybe, AnyOfTwo, MapV, OneOfSix, OneOfFour, AnyOfFour, Dyn, SRule, Leader, Surround, End, Req};
 
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Arg {
     pub id: Span<usize>,
-    pub ty: Span<usize>,
+    pub ty: Type,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -169,6 +169,7 @@ pub struct Func {
     pub fn_span: Span<usize>,
     pub id: Span<usize>,
     pub args: Vec<Arg>,
+    pub ret_type: ReturnType,
     pub body: Group,
 }
 
@@ -180,6 +181,15 @@ pub struct File {
 use ParseResult::*;
 
 pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
+    // create `expr` (it requires a number of recursive child nodes)
+    let group = SRule();
+    let expr = SRule();
+    let value = SRule();
+    let power = SRule();
+    let mul_or_div = SRule();
+    let ty = SRule();
+    let statement = SRule();
+
     // a rule that just consumes whitespace space
     let w = SpanOf(ZeroOrMore(OneOfTwo(..=32u32, 127u32)));
 
@@ -196,41 +206,53 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
     );
 
     let param = Map(
-        (ident.clone(), w.clone(), ':', w.clone(), ident.clone()),
+        Leader(
+            &ident,
+            (&w, Leader(
+                    ':', (&w, &ty),
+                    |colon_span, _, _| format!("{}: missing type after this colon", colon_span),
+                )
+            ),
+            |id_span, _, _| format!("{}: missing arg's type", id_span),
+        ),
         |res| {
-            res.map_value(|(id, _, _colon, _, ty)| {
-                Arg { id, ty }
+            res.map_value(|(id, (_, (_colon, (_, ty))))| {
+                Arg {
+                    id,
+                    ty,
+                }
             })
         }
     );
+
     let params = Map(
         OneOfThree(
-            w.clone(),
-            (param.clone(), w.clone()),
-            (param.clone(), OneOrMore((w.clone(), ',', w.clone(), param.clone()))),
+            (param.clone(), OneOrMore((w.clone(), Leader(',', (w.clone(), param.clone()), |_, comma_span, _| format!("{}: erroneous comma", comma_span))))),
+            param.clone(),
+            ()
         ),
         |res| {
             res.map_value(|any_of_three| {
                 match any_of_three {
-                    AnyOfThree::Child1(_) => Vec::<Arg>::new(),
-                    AnyOfThree::Child2((params, _)) => Vec::from([params]),
-                    AnyOfThree::Child3((param1, other_params)) => {
+                    AnyOfThree::Child1((param1, other_params)) => {
                         let mut accume = Vec::with_capacity(1 + other_params.len());
                         accume.push(param1);
-                        for (_, _comma, _, param) in other_params {
+                        for (_, (_comma, (_, param))) in other_params {
                             accume.push(param);
                         }
                         accume
                     },
+                    AnyOfThree::Child2(params) => Vec::from([params]),
+                    AnyOfThree::Child3(_) => Vec::new(),
                 }
             })
         }
     );
 
     let return_type = Map(
-        ("->", w.clone(), OneOfTwo(ident.clone(), '!')),
+        Leader("->", (&w, OneOfTwo(&ident, '!')), |arrow_span, _, _| format!("{}: missing return type", arrow_span)),
         |res| {
-            res.map_value(|(_arrow, _, any_of_two)| {
+            res.map_value(|(_arrow, (_, any_of_two))| {
                 match any_of_two {
                     AnyOfTwo::Child1(id) => ReturnType::Type(id),
                     AnyOfTwo::Child2(_) => ReturnType::Never,
@@ -348,37 +370,19 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
         }
     );
 
-
-    // create `expr` (it requires a number of recursive child nodes)
-    let group = SRule();
-    let expr = SRule();
-    let value = SRule();
-    let power = SRule();
-    let mul_or_div = SRule();
-    let add_or_sub = SRule();
-    let ty = SRule();
-    let statement = SRule();
-
     {
         expr.set(
             MapV(
-                (&mul_or_div, &w, OneOfTwo('+', '-'), &w, Dyn(&expr)),
-                |(value, _, add_or_sub, _, expr)| {
-                    match add_or_sub {
-                        AnyOfTwo::Child1(span) => Expr::Add(Box::new(value), span, Box::new(expr)),
-                        AnyOfTwo::Child2(span) => Expr::Sub(Box::new(value), span, Box::new(expr)),
-                    }
-                }
-            )
-        );
-
-        add_or_sub.set(
-            MapV(
-                (&mul_or_div, &w, OneOfTwo('+', '-'), &w, Dyn(&add_or_sub)),
-                |(value, _, mul_or_div, _, expr)| {
-                    match mul_or_div {
-                        AnyOfTwo::Child1(span) => Expr::Mul(Box::new(value), span, Box::new(expr)),
-                        AnyOfTwo::Child2(span) => Expr::Div(Box::new(value), span, Box::new(expr)),
+                (&mul_or_div, Maybe((&w, OneOfTwo('+', '-'), &w, Dyn(&expr)))),
+                |(value, maybe_add_or_sub)| {
+                    match maybe_add_or_sub {
+                        Some((_, add_or_sub, _, expr)) => {
+                            match add_or_sub {
+                                AnyOfTwo::Child1(span) => Expr::Add(Box::new(value), span, Box::new(expr)),
+                                AnyOfTwo::Child2(span) => Expr::Sub(Box::new(value), span, Box::new(expr)),
+                            }
+                        },
+                        None => value,
                     }
                 }
             )
@@ -386,11 +390,16 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
 
         mul_or_div.set(
             MapV(
-                (&power, &w, OneOfTwo('*', '/'), &w, Dyn(&mul_or_div)),
-                |(value, _, mul_or_div, _, expr)| {
-                    match mul_or_div {
-                        AnyOfTwo::Child1(span) => Expr::Mul(Box::new(value), span, Box::new(expr)),
-                        AnyOfTwo::Child2(span) => Expr::Div(Box::new(value), span, Box::new(expr)),
+                (&power, Maybe((&w, OneOfTwo('*', '/'), &w, Dyn(&mul_or_div)))),
+                |(value, maybe_mul_or_div)| {
+                    match maybe_mul_or_div {
+                        Some((_, mul_or_div, _, expr)) => {
+                            match mul_or_div {
+                                AnyOfTwo::Child1(span) => Expr::Add(Box::new(value), span, Box::new(expr)),
+                                AnyOfTwo::Child2(span) => Expr::Sub(Box::new(value), span, Box::new(expr)),
+                            }
+                        },
+                        None => value,
                     }
                 }
             )
@@ -398,9 +407,14 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
 
         power.set(
             MapV(
-                (&value, &w, '^', &w, Dyn(&power)),
-                |(value, _, pow, _, expr)| {
-                Expr::Pow(Box::new(value), pow, Box::new(expr))
+                (&value, Maybe((&w, '^', &w, Dyn(&power)))),
+                |(value, maybe_pow)| {
+                match maybe_pow {
+                    Some((_, pow, _, expr)) => {
+                        Expr::Pow(Box::new(value), pow, Box::new(expr))
+                    },
+                    None => value
+                }
             })
         );
 
@@ -426,8 +440,12 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
 
     group.set(
         MapV(
-            ('{', &w, ZeroOrMore((Dyn(&statement), &w)), '}'),
-            |(_lcbrace, _, statements, _rcbrace)| {
+            Surround(
+                    '{', (&w, ZeroOrMore((Dyn(&statement), &w))), '}',
+                    |_, _, e| e,
+                    |_, ocbrace_span, _, _| format!("{}: openning curly brace is missing its complementary closing curly brace to end the scope", ocbrace_span),
+                ),
+            |(_lcbrace, (_, statements), _rcbrace)| {
                 Group {
                     statements: statements.into_iter().map(|v|v.0).collect(),
                 }
@@ -441,17 +459,23 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
                 &ident,
                 Maybe((
                     &w,
-                    '<',
-                    &w,
-                    ZeroOrMore((Dyn(&ty), &w)),
-                    '>'
+                    Surround(
+                        '<',
+                        ( 
+                            &w,
+                            ZeroOrMore((Dyn(&ty), &w))
+                        ),
+                        '>',
+                        |_, oarrow_span, _| format!("{}: expected values within this type bounds", oarrow_span),
+                        |_, oarrow_span, _, _| format!("{}: expected closing arrow ('>') after this openning arrow ('<')", oarrow_span),
+                    )
                 ))
             ),
             |(ident, args)| {
                 Type {
                     name: ident,
                     args: match args {
-                        Some((_, _, _, args, _)) => {
+                        Some((_, (_, (_, args), _))) => {
                             args.into_iter().map(|v|v.0).collect()
                         },
                         None => Vec::new(),
@@ -464,15 +488,15 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
     statement.set(
         MapV(
             OneOfFour(
-                ("return", &w, &expr, Maybe((&w, ';'))),
-                ("let", &w, &ident, Maybe((&w, ':', &w, &ty)), &w, '=', &w, &expr, Maybe((&w, ';'))),
+                Leader("return", (&w, &expr, Maybe((&w, ';'))), |_, return_span, _| format!("{}: expected expression after this \"return\" keyword", return_span)),
+                Leader("let", (&w, &ident, Maybe((&w, ':', &w, &ty)), &w, '=', &w, &expr, Maybe((&w, ';'))), |_, let_span, _| format!("{} expected_variable assignment after this let statement", let_span)),
                 (&expr, Maybe((&w, ';'))),
                 ";",
             ),
             |any_of_four| {
                 match any_of_four {
                     // return
-                    AnyOfFour::Child1((return_span, _, expr, maybe_semi)) => {
+                    AnyOfFour::Child1((return_span, (_, expr, maybe_semi))) => {
                         Statement::Return {
                             return_span,
                             expr,
@@ -480,12 +504,12 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
                         }
                     },
                     // let
-                    AnyOfFour::Child2((let_span, _, ident, maybe_type, _, eq_span, _, expr, maybe_semi)) => {
+                    AnyOfFour::Child2((let_span, (_, ident, maybe_type, _, eq_span, _, expr, maybe_semi))) => {
                         Statement::Assign {
                             let_: let_span,
                             ident,
                             ty: match maybe_type {
-                                Some((_, colon_span, _, ty)) => Some(ty),
+                                Some((_, _colon_span, _, ty)) => Some(ty),
                                 None => None,
                             },
                             equal_sign: eq_span,
@@ -518,14 +542,30 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
     // the rule to parse a `Func`
     let func_rule = 
         MapV(
-            Spanned(("fn", &w, &ident, &w, '(', &w, &params, &w, ')', &w, &return_type, &w, '{', &w, OneOrMore(&statement), &w, '}')),
-            |(span, (f, _, ident, _, oparen, _, params, _, cparen, _, ret_type, _, ocbrace, _, statements, _, ccbrace))| {
+            Spanned(Leader(
+                "fn",
+                (&w, Leader(&ident,
+                        (&w,
+                            Surround(
+                                '(', (&w, &params, &w), ')',
+                                |_, oparen_span, _| format!("{}: expected parameters in this function argument scope", oparen_span),
+                                |_, oparen_span, _, _| format!("{}: expected closing parenthesis to match this open parenthesis", oparen_span)
+                            ),
+                            Req((&w, &return_type), |_, _, _| format!("function requires a return type")),
+                            Req((&w, &group), |_, _, _| format!("function requires a function body"))
+                        ),
+                        |_, ident_span, _| format!("{}: expected function parameters and body after function identifier", ident_span)
+                    )
+                ),
+                |_, fn_span, _| format!("{}: expected correct function syntax after 'fn' keyword", fn_span))),
+            |(span, (fn_span, (_, (id_span, (_, (_oparen, (_, params, _), _cparen), (_, ret_type), (_, body))))))| {
                 Func {
                     span,
-                    fn_span: f,
-                    id: ident,
-                    args: Vec::new(),
-                    body: Group { statements },
+                    fn_span,
+                    id: id_span,
+                    args: params,
+                    ret_type,
+                    body,
                 }
             }
         );
@@ -533,9 +573,9 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
     // the rule to parse a `File`
     let file_rule = 
         Map(
-            ZeroOrMore((&w, &func_rule, &w)),
-            |res: ParseResult<Vec<(Span<usize>, Func, Span<usize>)>, String, usize>| {
-                res.map_value(|v| {
+            (ZeroOrMore((&w, &func_rule)), &w, Req(End(), |_, _, _| format!("the parse did not make it to the end of the file"))),
+            |res: ParseResult<(Vec<(Span<usize>, Func)>, Span<usize>, ()), String, usize>| {
+                res.map_value(|(v, _, _)| {
                     File {
                         funcs: v.into_iter().map(|v|v.1).collect(),
                     }
@@ -556,13 +596,69 @@ mod tests {
     use ParseResult::*;
 
     #[test]
-    fn test_empty_fn() {
-        match parse_file(" \t  fn \t hello {} \t \r") {
+    fn test_stmt_semi_end_fn() {
+        match parse_file(" fn hello() -> u8 {  (10 + 3) * 3 / 4 ^ (10); 10; 23;  } ") {
             Okay(value) => {
-                print!("{:?}", value)
+                println!("{:?}", value)
             },
             OkayAdvance(value, advance) => {
-                print!("{:?} {:?}", value, advance)
+                println!("{:?} {:?}", value, advance)
+            },
+            Error(error) => panic!("Error: {}", error),
+            Panic(error) => panic!("Panic: {}", error),
+        }
+    }
+
+    #[test]
+    fn test_stmt_fn() {
+        match parse_file(" fn hello() -> u8 {  (10 + 3) * 3 / 4 ^ (10); 10; 23; 0 } ") {
+            Okay(value) => {
+                println!("{:?}", value)
+            },
+            OkayAdvance(value, advance) => {
+                println!("{:?} {:?}", value, advance)
+            },
+            Error(error) => panic!("Error: {}", error),
+            Panic(error) => panic!("Panic: {}", error),
+        }
+    }
+
+    #[test]
+    fn test_expr_fn() {
+        match parse_file(" fn hello() -> u8 {  (10 + 3) * 3 / 4 ^ (10) } ") {
+            Okay(value) => {
+                println!("{:?}", value)
+            },
+            OkayAdvance(value, advance) => {
+                println!("{:?} {:?}", value, advance)
+            },
+            Error(error) => panic!("Error: {}", error),
+            Panic(error) => panic!("Panic: {}", error),
+        }
+    }
+
+    #[test]
+    fn test_add_fn() {
+        match parse_file(" fn hello() -> u8 {10 + 3}") {
+            Okay(value) => {
+                println!("{:?}", value)
+            },
+            OkayAdvance(value, advance) => {
+                println!("{:?} {:?}", value, advance)
+            },
+            Error(error) => panic!("Error: {}", error),
+            Panic(error) => panic!("Panic: {}", error),
+        }
+    }
+
+    #[test]
+    fn test_empty_fn() {
+        match parse_file(" fn hello() -> u8 {0}") {
+            Okay(value) => {
+                println!("{:?}", value)
+            },
+            OkayAdvance(value, advance) => {
+                println!("{:?} {:?}", value, advance)
             },
             Error(error) => panic!("Error: {}", error),
             Panic(error) => panic!("Panic: {}", error),

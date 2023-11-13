@@ -19,7 +19,7 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 /// as a missing ending curly brace.
 /// 
 #[allow(non_snake_case)]
-pub fn Surround<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, Child3: ParseNode<Ok3, Err, Store, Pos, V>, MiddleFail: Fn(Ok1, Err) -> Err, EndFail: Fn(Ok1, Ok2, Err) -> Err, Ok1, Ok2, Ok3, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>(child1: Child1, child2: Child2, child3: Child3, middle_fail: MiddleFail, end_fail: EndFail) -> SurroundNode<Child1, Child2, Child3, MiddleFail, EndFail, Ok1, Ok2, Ok3, Err, Store, Pos, V> {
+pub fn Surround<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, Child3: ParseNode<Ok3, Err, Store, Pos, V>, MiddleFail: Fn(&Store, Ok1, Err) -> Err, EndFail: Fn(&Store, Ok1, Ok2, Err) -> Err, Ok1, Ok2, Ok3, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>(child1: Child1, child2: Child2, child3: Child3, middle_fail: MiddleFail, end_fail: EndFail) -> SurroundNode<Child1, Child2, Child3, MiddleFail, EndFail, Ok1, Ok2, Ok3, Err, Store, Pos, V> {
     SurroundNode {
         child1,
         child2,
@@ -31,7 +31,7 @@ pub fn Surround<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SurroundNode<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, Child3: ParseNode<Ok3, Err, Store, Pos, V>, MiddleFail: Fn(Ok1, Err) -> Err, EndFail: Fn(Ok1, Ok2, Err) -> Err, Ok1, Ok2, Ok3, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> {
+pub struct SurroundNode<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, Child3: ParseNode<Ok3, Err, Store, Pos, V>, MiddleFail: Fn(&Store, Ok1, Err) -> Err, EndFail: Fn(&Store, Ok1, Ok2, Err) -> Err, Ok1, Ok2, Ok3, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> {
     pub child1: Child1, 
     pub child2: Child2, 
     pub child3: Child3, 
@@ -40,7 +40,7 @@ pub struct SurroundNode<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: Pars
     _zst: ZSTNode<(Ok1, Ok2, Ok3), Err, Store, Pos, V>,
 }
 
-impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, Child3: ParseNode<Ok3, Err, Store, Pos, V>, MiddleFail: Fn(Ok1, Err) -> Err, EndFail: Fn(Ok1, Ok2, Err) -> Err, Ok1, Ok2, Ok3, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<(Ok1, Ok2, Ok3), Err, Store, Pos, V> for SurroundNode<Child1, Child2, Child3, MiddleFail, EndFail, Ok1, Ok2, Ok3, Err, Store, Pos, V> {
+impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, Child3: ParseNode<Ok3, Err, Store, Pos, V>, MiddleFail: Fn(&Store, Ok1, Err) -> Err, EndFail: Fn(&Store, Ok1, Ok2, Err) -> Err, Ok1, Ok2, Ok3, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<(Ok1, Ok2, Ok3), Err, Store, Pos, V> for SurroundNode<Child1, Child2, Child3, MiddleFail, EndFail, Ok1, Ok2, Ok3, Err, Store, Pos, V> {
     fn parse(&self, store: &Store, mut pos: Pos) -> ParseResult<(Ok1, Ok2, Ok3), Err, Pos> {
         use ParseResult::*;
         let ok1 = match self.child1.parse(store, pos.clone()) {
@@ -59,7 +59,7 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
                 pos = advance;
                 v
             },
-            Error(error) => return Panic((self.middle_fail)(ok1, error)),
+            Error(error) => return Panic((self.middle_fail)(store, ok1, error)),
             Panic(error) => return Panic(error),
         };
 
@@ -69,7 +69,7 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
                 pos = advance;
                 v
             },
-            Error(error) => return Panic((self.end_fail)(ok1, ok2, error)),
+            Error(error) => return Panic((self.end_fail)(store, ok1, ok2, error)),
             Panic(error) => return Panic(error),
         };
 

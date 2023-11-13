@@ -24,6 +24,6 @@ impl <Err: From<UnexpectedEndError<Pos>> + From<UnexpectedValueError<Pos, char>>
 
 impl <Err: From<UnexpectedEndError<Pos>> + From<UnexpectedValueError<Pos, char>>, Store: ParseStore<Pos, char>, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, char> for String {
     fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
-        <&str as ParseNode<Span<Pos>, Err, Store, Pos, char>>::parse(&self.as_str(), store, pos)
+        ParseNode::parse(&self.as_str(), store, pos)
     }
 }

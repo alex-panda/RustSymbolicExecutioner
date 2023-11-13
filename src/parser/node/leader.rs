@@ -8,7 +8,7 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 /// will wrap in a `ParseResult::Panic` and return.
 /// 
 #[allow(non_snake_case)]
-pub fn Leader<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, F: Fn(Ok1, Err) -> Err, Ok1, Ok2, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>(child1: Child1, child2: Child2, f: F) -> LeaderNode<Child1, Child2, F, Ok1, Ok2, Err, Store, Pos, V> {
+pub fn Leader<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, F: Fn(&Store, Ok1, Err) -> Err, Ok1, Ok2, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>(child1: Child1, child2: Child2, f: F) -> LeaderNode<Child1, Child2, F, Ok1, Ok2, Err, Store, Pos, V> {
     LeaderNode {
         child1,
         child2,
@@ -18,14 +18,14 @@ pub fn Leader<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2,
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct LeaderNode<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, F: Fn(Ok1, Err) -> Err, Ok1, Ok2, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> {
+pub struct LeaderNode<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, F: Fn(&Store, Ok1, Err) -> Err, Ok1, Ok2, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> {
     pub child1: Child1, 
     pub child2: Child2, 
     pub func: F,
     _zst: ZSTNode<(Ok1, Ok2), Err, Store, Pos, V>,
 }
 
-impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, F: Fn(Ok1, Err) -> Err, Ok1, Ok2, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<(Ok1, Ok2), Err, Store, Pos, V> for LeaderNode<Child1, Child2, F, Ok1, Ok2, Err, Store, Pos, V> {
+impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, F: Fn(&Store, Ok1, Err) -> Err, Ok1, Ok2, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<(Ok1, Ok2), Err, Store, Pos, V> for LeaderNode<Child1, Child2, F, Ok1, Ok2, Err, Store, Pos, V> {
     fn parse(&self, store: &Store, mut pos: Pos) -> ParseResult<(Ok1, Ok2), Err, Pos> {
         use ParseResult::*;
 
@@ -47,7 +47,7 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
                 pos = advance;
                 v
             },
-            Error(error) => return Panic((self.func)(ok1, error)),
+            Error(error) => return Panic((self.func)(store, ok1, error)),
             Panic(error) => return Panic(error),
         };
 

@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, fmt::{Display, Write}};
 
 use super::{ParsePos, ParseStore, ParseValue};
 
@@ -19,26 +19,32 @@ impl <Pos: ParsePos> Span<Pos> {
     }
 
     pub fn values<Store: ParseStore<Pos, V>, V: ParseValue>(self, store: &Store) -> SpanValueIter<Store, Pos, V> {
-        SpanValueIter::new(store, self)
+        SpanValueIter { span: self.clone(), store, phantom: PhantomData }
     }
 }
 
+impl <Pos: ParsePos> Display for Span<Pos> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.start, f)?;
+        f.write_char('-')?;
+        Display::fmt(&self.end, f)
+    }
+}
 
 // --- Value Iterator ---
 
 /// 
 /// An iterator that returns every value of a span.
 /// 
-#[derive(Clone)]
 pub struct SpanValueIter<'a, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> {
-    pub span: Span<Pos>,
-    pub store: &'a Store,
+    span: Span<Pos>,
+    store: &'a Store,
     phantom: PhantomData<V>,
 }
 
-impl <'a, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> SpanValueIter<'a, Store, Pos, V> {
-    pub fn new(store: &'a Store, span: Span<Pos>) -> Self {
-        Self { span, store, phantom: PhantomData }
+impl <'a, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> Clone for SpanValueIter<'a, Store, Pos, V> {
+    fn clone(&self) -> Self {
+        Self { span: self.span.clone(), store: self.store.clone(), phantom: self.phantom.clone() }
     }
 }
 
@@ -50,6 +56,16 @@ impl <'a, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> Iterator for 
         }
 
         self.store.value_at(&mut self.span.start)
+    }
+}
+
+impl <'a, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> Display for SpanValueIter<'a, Store, Pos, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for value in self.clone() {
+            Display::fmt(&value, f)?;
+        }
+
+        Ok(())
     }
 }
 

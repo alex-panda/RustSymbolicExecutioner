@@ -31,15 +31,16 @@ impl <I: Iterator<Item = Item> + ParsePos, Item: ParseValue> ParseStore<I, Item>
     fn value_at(&self, pos: &mut I) -> Option<Item> {
         pos.next()
     }
-}
+} 
 
 impl ParseStore<usize, char> for &str {
     fn value_at(&self, pos: &mut usize) -> Option<char> {
-        let mut chars = self[*pos..].chars();
-        let next = chars.next();
+        let next = self[*pos..].chars().next();
 
-        if let Some(_) = next {
-            *pos = *pos + (self.as_ptr() as usize).abs_diff(chars.as_str().as_ptr() as usize);
+        if let Some(c) = next {
+            let mut buffer = [0; 4];
+            // advance the position by however many bytes it takes to hold the character
+            *pos += c.encode_utf8(&mut buffer).len();
         }
 
         next
