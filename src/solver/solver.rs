@@ -1,9 +1,8 @@
 use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
 
-static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
+//static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
 
-pub fn solver_example() -> Result<(), Box<dyn std::error::Error>> {
-    let mut solver = Solver::new(Z3Binary::new(PATH_TO_SOLVER)?)?;
+pub fn solver_example(solver: &mut Solver<Z3Binary>) -> Result<(), Box<dyn std::error::Error>> {
     let arg_vec = vec!["x", "y", "q", "test"];
     let mut int_vec = Vec::new();
     let mut i = 0;
