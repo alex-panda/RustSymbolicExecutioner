@@ -1,11 +1,11 @@
 mod parser;
 mod compiler;
-mod solver;
+mod symex;
 
 use std::env;
 //use equation_solver::*;
 use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
-use crate::solver::{SymVar, SymExEngine};
+use crate::symex::{SymVar, SymExEngine};
 
 static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
 

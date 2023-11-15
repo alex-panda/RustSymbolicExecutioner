@@ -1,23 +1,50 @@
 use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
 
-//static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
+static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
 
-fn find_int(var:&str, vec:Vec<Const<Int>>) -> Const<Int> {
-    let v = "|".to_owned() + var + "|";
-    let mut i = 0;
-    while i < vec.len() {
-        if vec[i].name() == v {
-            return vec[i];
+pub struct SymSolver {
+    s: Solver<Z3Binary>,
+    var: Vec<Const<Int>>,
+    pi_str: String,
+}
+
+impl SymSolver {
+    pub fn new() -> Self {
+        SymSolver {
+            s: Solver::new(Z3Binary::new(PATH_TO_SOLVER).expect("Path to Z3 not found")).expect("Could not create Z3 Solver"),
+            var: Vec::new(),
+            pi_str: "true".to_string(),
         }
-        i = i + 1;
     }
-    panic!("No Int found matching {}", var);
+    pub fn to_string(&self) -> String {
+        format!("{}", &self.pi_str)
+    }
+
+    pub fn add_int(&mut self, v: String) {
+        self.var.push(Int::from_name(v));
+    }
+
+    pub fn find_int(&self, v:&str) -> Const<Int> {
+        let find = "|".to_owned() + v + "|";
+        let mut i = 0;
+        while i < self.var.len() {
+            if self.var[i].name() == find {
+                return self.var[i];
+            }
+            i = i + 1;
+        }
+        panic!("No Int found matching {}", v);
+    }
+
+    pub fn add_assertion_to_pi_str(&mut self, assert: &String) {
+        self.pi_str = self.pi_str.clone() + assert;
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
-    use crate::solver::*;
+    use crate::symex::*;
     static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
 
     #[test]
@@ -29,12 +56,10 @@ mod tests {
     
         while i < arg_vec.len() {
             int_vec.push(Int::from_name(arg_vec[i]));
-            solver.assert(int_vec[i]._neq(i64::try_from(i).unwrap() + 1))?;
+            solver.assert(int_vec[i]._neq((i64::try_from(i).unwrap() + 1)* 6))?;
         
             i = i + 1;
         }
-    
-        solver::find_int("q", int_vec.clone());
     
         match solver.check_sat_with_model()? {
             SatResultWithModel::Sat(model) => {

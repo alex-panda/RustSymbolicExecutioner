@@ -1,5 +1,5 @@
-mod solver;
-pub use solver::*;
+mod symsolver;
+pub use symsolver::*;
 
 mod engine;
 pub use engine::*;
