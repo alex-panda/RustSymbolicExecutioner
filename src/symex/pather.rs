@@ -49,7 +49,6 @@ mod tests {
     pub fn start() {
         let mut engines: Vec<SymExEngine> = Vec::new();
         pather::new_engine(&mut engines);
-        pather::new_engine(&mut engines);
         println!("{}", engines[0].to_string());
     }
 
@@ -58,7 +57,11 @@ mod tests {
         let mut engines: Vec<SymExEngine> = Vec::new();
         pather::new_engine(&mut engines);
         pather::new_engine(&mut engines);
-        new_assert(&mut engines, 1, "x = 5".to_string());
+        engines[1].new_variable("x".to_string(), "i32".to_string());
+        engines[1].new_variable_assign("y".to_string(), "u64".to_string(), "5 + 6".to_string());
+        engines[1].assign_symvar_value("x + 4".to_string(), "x".to_string());
+        engines[1].assign_symvar_value("x * 2".to_string(), "y".to_string());
+        new_assert(&mut engines, 1, "y = 18".to_string());
         println!("{}", engines[2].to_string());
     }
 

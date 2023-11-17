@@ -41,12 +41,10 @@ mod test {
 
         solver.declare_const("n", "Int")?;
         solver.declare_const("m", "Int")?;
-        solver.assert("(>= (+ (* n 1) (* m 1)) 7)")?;
+        solver.assert("(not(= (* (* n 1) (* m 1)) (+ n 7)))")?;
 
         let is_sat = solver.check_sat()?;
         assert!(is_sat);
         Ok(())
     }
-    
-
 }

@@ -23,6 +23,8 @@ pub fn eval(stmt_rs: String) -> String {
     return new;
 }
 
+
+
 impl SymExEngine {
     pub fn to_string(&self) -> String {
         let mut i = 0;
@@ -50,16 +52,26 @@ impl SymExEngine {
         self.pi.add_int(var_name.clone())
     }
 
-
-    pub fn assign_symvar_value(&mut self, mut stmt_rs: String, stmt_ls: String) {
+    pub fn display_as_var0(&mut self, mut st: String) -> String {
+        let mut stmt = st.clone();
         let mut i = 0;
         while i < self.sigma.len() {
-            if stmt_rs.contains(&self.sigma[i].name) {
+            let f = &self.sigma[i].name.eq(&self.sigma[i].var0);
+            if stmt.contains(&self.sigma[i].name) && !f {
                 let s = format!("({})", self.sigma[i].var0);
-                stmt_rs = stmt_rs.replace(&self.sigma[i].name, &s);
+                stmt = stmt.replace(&self.sigma[i].name, &s);
+            }
+            else if *f {
+                let s = format!("{}", self.sigma[i].var0);
+                stmt = stmt.replace(&self.sigma[i].name, &s);
             }
             i = i + 1;
         }
+        return stmt;
+    }
+
+    pub fn assign_symvar_value(&mut self, mut stmt_rs: String, stmt_ls: String) {
+        stmt_rs = self.display_as_var0(stmt_rs);
         let mut j = 0;
         let mut found = false;
         while j < self.sigma.len() {
@@ -76,14 +88,14 @@ impl SymExEngine {
     }
 
     pub fn new_assertion(&mut self, assert: String) {
-        let and_assert = " && ".to_owned() + &assert;
+        let var0_assert = self.display_as_var0(assert.clone());
+        let and_assert = " && ".to_owned() + &var0_assert;
         self.pi.add_assertion_to_pi_str(&and_assert);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
     use crate::symex::*;
     use equation_solver::*;
     static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
@@ -100,7 +112,7 @@ mod tests {
             e.new_variable("x".to_string(), "i32".to_string());
             e.new_variable_assign("y".to_string(), "u64".to_string(), "5 + 6".to_string());
             e.assign_symvar_value("x + 4".to_string(), "x".to_string());
-            e.assign_symvar_value("y * 2".to_string(), "y".to_string());
+            e.assign_symvar_value("x * 2".to_string(), "y".to_string());
 
             println!("{}", e.to_string());
 
