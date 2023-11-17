@@ -17,15 +17,7 @@ fn main() {
     }
     println!("{}", &args[1]);
 
-   // let init_engine = || -> Result<(), Box<dyn std::error::Error>> {
-    //    let mut engine = SymExEngine {
-     //       pi: Solver::new(Z3Binary::new(PATH_TO_SOLVER)?)?,
-     //       pi_str: "true".to_string(),
-     //       sigma: Vec::new(),
-     //       path: 1,
-      //  };
-
-        let valid = compiler::compile_input(&args[1]);
+    let valid = compiler::compile_input(&args[1]);
         if valid {
             println!("Hello World!");
         }
@@ -33,10 +25,28 @@ fn main() {
         else {
             println!("Could not compile");
         }
-     //   Ok(())
-  //  };
+}
 
-   // if let Err(_err) = init_engine() {
-   //     println!("Failed to initialize symbolic execution engine.");
-   // }
+
+#[cfg(test)] 
+mod test {
+
+    use rsmt2::*;
+
+    #[test]
+    fn rsmt2_test() -> Result<(), Box<dyn std::error::Error>> {
+        let parser = ();
+        let conf = SmtConf::z3("z3\\bin\\z3.exe");
+        let mut solver = conf.spawn(parser).unwrap();
+
+        solver.declare_const("n", "Int")?;
+        solver.declare_const("m", "Int")?;
+        solver.assert("(>= (+ (* n 1) (* m 1)) 7)")?;
+
+        let is_sat = solver.check_sat()?;
+        assert!(is_sat);
+        Ok(())
+    }
+    
+
 }

@@ -6,3 +6,6 @@ pub use engine::*;
 
 mod symvar;
 pub use symvar::*;
+
+mod pather;
+pub use pather::*;

@@ -16,6 +16,15 @@ impl SymSolver {
             pi_str: "true".to_string(),
         }
     }
+
+    pub fn copy_solver(&self) -> SymSolver {
+        let solver = &self.s;
+        SymSolver {
+            s: Solver::new(Z3Binary::new(PATH_TO_SOLVER).expect("Path to Z3 not found")).expect("Could not create Z3 Solver"),
+            var: self.var.clone(),
+            pi_str: self.pi_str.clone()
+        }
+    }
     pub fn to_string(&self) -> String {
         format!("{}", &self.pi_str)
     }
@@ -47,6 +56,7 @@ mod tests {
     use crate::symex::*;
     static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
 
+   
     #[test]
     fn solver_example() -> Result<(), Box<dyn std::error::Error>> {
         let mut solver = Solver::new(Z3Binary::new(PATH_TO_SOLVER)?)?;
@@ -57,7 +67,7 @@ mod tests {
         while i < arg_vec.len() {
             int_vec.push(Int::from_name(arg_vec[i]));
             solver.assert(int_vec[i]._neq((i64::try_from(i).unwrap() + 1)* 6))?;
-        
+            //solver.assert("(= (+ (* 5 6) (* 5 6)) 7)")?;
             i = i + 1;
         }
     

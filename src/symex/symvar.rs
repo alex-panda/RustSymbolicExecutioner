@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct SymVar {
     pub name: String,
     pub var0: String,
