@@ -23,7 +23,7 @@ pub struct NotNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: From<Unexp
 use ParseResult::*;
 impl <Ok, Err: From<UnexpectedSuccessError<Pos>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<(), Err, Store, Pos, V> for NotNode<Child, Ok, Err, Store, Pos, V> {
     fn parse(&self, store: &Store, pos: Pos) -> ParseResult<(), Err, Pos> {
-        match self.child.parse(store, pos.clone()) {
+        match self.child.parse_span(store, pos.clone()) {
             Okay(_) | OkayAdvance(_, _) => Error(UnexpectedSuccessError { pos }.into()),
             Error(_) => Okay(()),
             Panic(err) => Panic(err),

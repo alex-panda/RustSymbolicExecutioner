@@ -1,4 +1,6 @@
-use super::{AnyOfSix, ParseResult, Span, ZeroOrMore, ParseNode, OneOfTwo, SpanOf, Map, OneOfThree, Spanned, OneOrMore, AnyOfThree, Maybe, AnyOfTwo, MapV, OneOfSix, OneOfFour, AnyOfFour, Dyn, SRule, Leader, Surround, End, Req};
+use crate::parser::AnyOf6;
+
+use super::{ParseResult, Span, ZeroOrMore, ParseNode, SpanOf, Map, OneOf3, Spanned, OneOrMore, AnyOf3, Maybe, AnyOf2, MapV, OneOf6, SRule, Leader, Surround, End, Req, OneOf5, AnyOf5, AnyOf4, OneOf4, OneOf2};
 
 
 #[derive(Debug, PartialEq, Clone)]
@@ -13,15 +15,30 @@ pub struct Group {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Type {
-    /// The name of the type.
-    name: Span<usize>,
-    /// The arguments for the type.
-    args: Vec<Self>,
+pub enum Type {
+    Array {
+        /// The type of every item in the array (since arrays can only hold 1
+        /// type of item, this is that type).
+        item_type: Box<Self>,
+        /// The number of items in the array.
+        item_number: usize,
+    },
+    Tuple {
+        /// The types in the tuple, stored in the same order as given.
+        types: Vec<Self>,
+    },
+    Template {
+        /// The name of the type.
+        name: Span<usize>,
+        /// The arguments for the type.
+        args: Vec<Self>,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
+    Var(Span<usize>),
+    Path(Vec<Span<usize>>),
     Int(Integer),
     Float(Float),
     Group(Group),
@@ -189,19 +206,20 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
     let mul_or_div = SRule();
     let ty = SRule();
     let statement = SRule();
+    let type_tuple = SRule();
 
     // a rule that just consumes whitespace space
-    let w = SpanOf(ZeroOrMore(OneOfTwo(..=32u32, 127u32)));
+    let w = SpanOf(ZeroOrMore(OneOf2(..=32u32, 127u32)));
 
     // a rule to parse an ascii letter (lower case or upper case)
-    let alpha = SpanOf(OneOfTwo(97..=122, 65..=90));
+    let alpha = SpanOf(OneOf2(97..=122, 65..=90));
     // a rule to parse an ascii numeric (0,1,2,etc.)
     let numeric = SpanOf(48..=57);
     // a rule to parse an identifier
     let ident = SpanOf(
         (
-            OneOfTwo(alpha.clone(), '_'),
-            ZeroOrMore(OneOfThree(alpha.clone(), numeric.clone(), '_'))
+            OneOf2(alpha.clone(), '_'),
+            ZeroOrMore(OneOf3(alpha.clone(), numeric.clone(), '_'))
         )
     );
 
@@ -210,10 +228,10 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
             &ident,
             (&w, Leader(
                     ':', (&w, &ty),
-                    |colon_span, _, _| format!("{}: missing type after this colon", colon_span),
+                    |colon_span, _, _| format!("{}: (param) missing type after this colon", colon_span),
                 )
             ),
-            |id_span, _, _| format!("{}: missing arg's type", id_span),
+            |id_span, _, _| format!("{}: (param) missing arg's type", id_span),
         ),
         |res| {
             res.map_value(|(id, (_, (_colon, (_, ty))))| {
@@ -226,15 +244,15 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
     );
 
     let params = Map(
-        OneOfThree(
-            (param.clone(), OneOrMore((w.clone(), Leader(',', (w.clone(), param.clone()), |_, comma_span, _| format!("{}: erroneous comma", comma_span))))),
+        OneOf3(
+            (param.clone(), OneOrMore((w.clone(), Leader(',', (w.clone(), param.clone()), |_, comma_span, _| format!("{}: (params) erroneous comma", comma_span))))),
             param.clone(),
             ()
         ),
         |res| {
             res.map_value(|any_of_three| {
                 match any_of_three {
-                    AnyOfThree::Child1((param1, other_params)) => {
+                    AnyOf3::Child1((param1, other_params)) => {
                         let mut accume = Vec::with_capacity(1 + other_params.len());
                         accume.push(param1);
                         for (_, (_comma, (_, param))) in other_params {
@@ -242,20 +260,20 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
                         }
                         accume
                     },
-                    AnyOfThree::Child2(params) => Vec::from([params]),
-                    AnyOfThree::Child3(_) => Vec::new(),
+                    AnyOf3::Child2(params) => Vec::from([params]),
+                    AnyOf3::Child3(_) => Vec::new(),
                 }
             })
         }
     );
 
     let return_type = Map(
-        Leader("->", (&w, OneOfTwo(&ident, '!')), |arrow_span, _, _| format!("{}: missing return type", arrow_span)),
+        Leader("->", (&w, OneOf2(&ident, '!')), |arrow_span, _, _| format!("{}: (return_type) missing return type", arrow_span)),
         |res| {
             res.map_value(|(_arrow, (_, any_of_two))| {
                 match any_of_two {
-                    AnyOfTwo::Child1(id) => ReturnType::Type(id),
-                    AnyOfTwo::Child2(_) => ReturnType::Never,
+                    AnyOf2::Child1(id) => ReturnType::Type(id),
+                    AnyOf2::Child2(_) => ReturnType::Never,
                 }
             })
         }
@@ -263,7 +281,7 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
 
     let unt_type = 
         MapV(
-            OneOfSix(
+            OneOf6(
                 "u8",
                 "u16",
                 "u32",
@@ -272,7 +290,7 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
                 "usize",
             ),
             |res| {
-                use AnyOfSix::*;
+                use AnyOf6::*;
                 match res {
                     Child1(span) => IntegerType::Unsigned(span, UntType::U8),
                     Child2(span) => IntegerType::Unsigned(span, UntType::U16),
@@ -286,7 +304,7 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
 
     let int_type = 
         MapV(
-            OneOfSix(
+            OneOf6(
                 "i8",
                 "i16",
                 "i32",
@@ -295,7 +313,7 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
                 "isize",
             ),
             |res| {
-                use AnyOfSix::*;
+                use AnyOf6::*;
                 match res {
                     Child1(span) => IntegerType::Signed(span, IntType::I8),
                     Child2(span) => IntegerType::Signed(span, IntType::I16),
@@ -309,9 +327,9 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
 
     let integer = MapV(
         Spanned((
-            Maybe(OneOfTwo('+', '-')),
+            Maybe(OneOf2('+', '-')),
             SpanOf(OneOrMore(numeric.clone())),
-            Maybe(OneOfTwo(
+            Maybe(OneOf2(
                 int_type.clone(),
                 unt_type.clone(),
             ))
@@ -319,8 +337,8 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
         |(span, (sign, numerics, t))| {
             let (sign_span, sign) = match sign.clone() {
                 Some(v) => match v {
-                    AnyOfTwo::Child1(span) => (Some(span), Sign::Positive),
-                    AnyOfTwo::Child2(span) => (Some(span), Sign::Negative),
+                    AnyOf2::Child1(span) => (Some(span), Sign::Positive),
+                    AnyOf2::Child2(span) => (Some(span), Sign::Negative),
                 },
                 None => (None, Sign::Positive)
             };
@@ -332,8 +350,8 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
                 numerics,
                 ty: match t {
                     Some(value) => Some(match value {
-                        AnyOfTwo::Child1(ty) => ty,
-                        AnyOfTwo::Child2(ty) => ty,
+                        AnyOf2::Child1(ty) => ty,
+                        AnyOf2::Child2(ty) => ty,
                     }), 
                     None => None
                 },
@@ -342,20 +360,20 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
     );
 
     let float = MapV(
-        Spanned((Maybe(OneOfTwo('-', '+')), SpanOf((OneOrMore(numeric.clone()), '.', OneOrMore(numeric.clone()))), Maybe(OneOfTwo("f32", "f64")))),
+        Spanned((Maybe(OneOf2('-', '+')), SpanOf((OneOrMore(numeric.clone()), '.', OneOrMore(numeric.clone()))), Maybe(OneOf2("f32", "f64")))),
         |(span, (sign, numerics, ty))| {
             let (sign_span, sign) = match sign {
                 Some(v) => match v {
-                    AnyOfTwo::Child1(span) => (Some(span), Sign::Negative),
-                    AnyOfTwo::Child2(span) => (Some(span), Sign::Positive),
+                    AnyOf2::Child1(span) => (Some(span), Sign::Negative),
+                    AnyOf2::Child2(span) => (Some(span), Sign::Positive),
                 },
                 None => (None, Sign::Positive),
             };
 
             let ty = match ty {
                 Some(v) => Some(match v {
-                    AnyOfTwo::Child1(span) => FloatType::F32(span),
-                    AnyOfTwo::Child2(span) => FloatType::F64(span),
+                    AnyOf2::Child1(span) => FloatType::F32(span),
+                    AnyOf2::Child2(span) => FloatType::F64(span),
                 }),
                 None => None
             };
@@ -373,13 +391,13 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
     {
         expr.set(
             MapV(
-                (&mul_or_div, Maybe((&w, OneOfTwo('+', '-'), &w, Dyn(&expr)))),
+                (&mul_or_div, Maybe((&w, OneOf2('+', '-'), &w, expr.din()))),
                 |(value, maybe_add_or_sub)| {
                     match maybe_add_or_sub {
                         Some((_, add_or_sub, _, expr)) => {
                             match add_or_sub {
-                                AnyOfTwo::Child1(span) => Expr::Add(Box::new(value), span, Box::new(expr)),
-                                AnyOfTwo::Child2(span) => Expr::Sub(Box::new(value), span, Box::new(expr)),
+                                AnyOf2::Child1(span) => Expr::Add(Box::new(value), span, Box::new(expr)),
+                                AnyOf2::Child2(span) => Expr::Sub(Box::new(value), span, Box::new(expr)),
                             }
                         },
                         None => value,
@@ -390,13 +408,13 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
 
         mul_or_div.set(
             MapV(
-                (&power, Maybe((&w, OneOfTwo('*', '/'), &w, Dyn(&mul_or_div)))),
+                (&power, Maybe((&w, OneOf2('*', '/'), &w, mul_or_div.din()))),
                 |(value, maybe_mul_or_div)| {
                     match maybe_mul_or_div {
                         Some((_, mul_or_div, _, expr)) => {
                             match mul_or_div {
-                                AnyOfTwo::Child1(span) => Expr::Add(Box::new(value), span, Box::new(expr)),
-                                AnyOfTwo::Child2(span) => Expr::Sub(Box::new(value), span, Box::new(expr)),
+                                AnyOf2::Child1(span) => Expr::Add(Box::new(value), span, Box::new(expr)),
+                                AnyOf2::Child2(span) => Expr::Sub(Box::new(value), span, Box::new(expr)),
                             }
                         },
                         None => value,
@@ -407,7 +425,7 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
 
         power.set(
             MapV(
-                (&value, Maybe((&w, '^', &w, Dyn(&power)))),
+                (&value, Maybe((&w, '^', &w, power.din()))),
                 |(value, maybe_pow)| {
                 match maybe_pow {
                     Some((_, pow, _, expr)) => {
@@ -420,18 +438,20 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
 
         value.set(
             MapV(
-                OneOfFour(
+                OneOf5(
+                    &ident,
                     &integer,
                     &float,
-                    ('(', &w, Dyn(&expr), &w, ')'),
+                    ('(', &w, expr.din(), &w, ')'),
                     &group
                 ),
                 |res| {
                     match res {
-                        AnyOfFour::Child1(int) => Expr::Int(int),
-                        AnyOfFour::Child2(float) => Expr::Float(float),
-                        AnyOfFour::Child3((_oparen, _, expr, _, _cparen)) => expr,
-                        AnyOfFour::Child4(group) => Expr::Group(group),
+                        AnyOf5::Child1(ident) => Expr::Var(ident),
+                        AnyOf5::Child2(int) => Expr::Int(int),
+                        AnyOf5::Child3(float) => Expr::Float(float),
+                        AnyOf5::Child4((_oparen, _, expr, _, _cparen)) => expr,
+                        AnyOf5::Child5(group) => Expr::Group(group),
                     }
                 }
             )
@@ -441,7 +461,7 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
     group.set(
         MapV(
             Surround(
-                    '{', (&w, ZeroOrMore((Dyn(&statement), &w))), '}',
+                    '{', (&w, ZeroOrMore((statement.din(), &w))), '}',
                     |_, _, e| e,
                     |_, ocbrace_span, _, _| format!("{}: openning curly brace is missing its complementary closing curly brace to end the scope", ocbrace_span),
                 ),
@@ -453,33 +473,70 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
         )
     );
 
+    type_tuple.set(
+        MapV(
+            Surround(
+                '(',
+                    (
+                        &w,
+                        Maybe(
+                        (ty.din(), &w, ZeroOrMore((',', &w, &ty, &w)))
+                        )
+                    ),
+                ')',
+                |_, _, e| e,
+                |_, oparen_span, _, _| format!("{}: missing closing parenthesis after this open parenthesis", oparen_span),
+            ),
+            |(oparen_span, (_, maybe_types), cparen_span)| {
+                match maybe_types {
+                    Some((t1, _, types)) => {
+                        let mut types: Vec<Type> = types.into_iter().map(|v|v.2).collect();
+                        types.insert(0, t1);
+                        Type::Tuple { types }
+                    },
+                    None => Type::Tuple { types: Vec::new() },
+                }
+            }
+        )
+    );
+
     ty.set(
         MapV(
-            (
-                &ident,
-                Maybe((
-                    &w,
-                    Surround(
-                        '<',
-                        ( 
-                            &w,
-                            ZeroOrMore((Dyn(&ty), &w))
-                        ),
-                        '>',
-                        |_, oarrow_span, _| format!("{}: expected values within this type bounds", oarrow_span),
-                        |_, oarrow_span, _, _| format!("{}: expected closing arrow ('>') after this openning arrow ('<')", oarrow_span),
-                    )
-                ))
+            OneOf2(
+                type_tuple.din(),
+                (
+                    &ident,
+                    Maybe((
+                        &w,
+                        Surround(
+                            '<',
+                            ( 
+                                &w,
+                                ZeroOrMore((ty.din(), &w))
+                            ),
+                            '>',
+                        |_, oarrow_span, _| format!("{}: (ty) expected values within this type bounds", oarrow_span),
+                            |_, oarrow_span, _, _| format!("{}: (ty) expected closing arrow ('>') after this openning arrow ('<')", oarrow_span),
+                        )
+                    ))
+                )
             ),
-            |(ident, args)| {
-                Type {
-                    name: ident,
-                    args: match args {
-                        Some((_, (_, (_, args), _))) => {
-                            args.into_iter().map(|v|v.0).collect()
-                        },
-                        None => Vec::new(),
+            |any_of_two| {
+                match any_of_two {
+                    AnyOf2::Child1(ty) => {
+                        ty
                     },
+                    AnyOf2::Child2((ident, args)) => {
+                        Type::Template {
+                            name: ident,
+                            args: match args {
+                                Some((_, (_, (_, args), _))) => {
+                                    args.into_iter().map(|v|v.0).collect()
+                                },
+                                None => Vec::new(),
+                            },
+                        }
+                    }
                 }
             }
         )
@@ -487,7 +544,7 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
 
     statement.set(
         MapV(
-            OneOfFour(
+            OneOf4(
                 Leader("return", (&w, &expr, Maybe((&w, ';'))), |_, return_span, _| format!("{}: expected expression after this \"return\" keyword", return_span)),
                 Leader("let", (&w, &ident, Maybe((&w, ':', &w, &ty)), &w, '=', &w, &expr, Maybe((&w, ';'))), |_, let_span, _| format!("{} expected_variable assignment after this let statement", let_span)),
                 (&expr, Maybe((&w, ';'))),
@@ -496,7 +553,7 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
             |any_of_four| {
                 match any_of_four {
                     // return
-                    AnyOfFour::Child1((return_span, (_, expr, maybe_semi))) => {
+                    AnyOf4::Child1((return_span, (_, expr, maybe_semi))) => {
                         Statement::Return {
                             return_span,
                             expr,
@@ -504,7 +561,7 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
                         }
                     },
                     // let
-                    AnyOfFour::Child2((let_span, (_, ident, maybe_type, _, eq_span, _, expr, maybe_semi))) => {
+                    AnyOf4::Child2((let_span, (_, ident, maybe_type, _, eq_span, _, expr, maybe_semi))) => {
                         Statement::Assign {
                             let_: let_span,
                             ident,
@@ -521,7 +578,7 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
                         }
                     },
                     // expr
-                    AnyOfFour::Child3((expr, maybe_semi)) => {
+                    AnyOf4::Child3((expr, maybe_semi)) => {
                         Statement::Expr {
                             expr,
                             semi: match maybe_semi {
@@ -531,7 +588,7 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
                         }
                     },
                     // semi
-                    AnyOfFour::Child4(semi_span) => {
+                    AnyOf4::Child4(semi_span) => {
                         Statement::SColon { semi: semi_span }
                     },
                 }
@@ -548,16 +605,16 @@ pub fn parse_file(file: &str) -> ParseResult<File, String, usize> {
                         (&w,
                             Surround(
                                 '(', (&w, &params, &w), ')',
-                                |_, oparen_span, _| format!("{}: expected parameters in this function argument scope", oparen_span),
-                                |_, oparen_span, _, _| format!("{}: expected closing parenthesis to match this open parenthesis", oparen_span)
+                                |_, oparen_span, _| format!("{}: (func_rule) expected parameters in this function argument scope", oparen_span),
+                                |_, oparen_span, _, _| format!("{}: (func_rule) expected closing parenthesis to match this open parenthesis", oparen_span)
                             ),
-                            Req((&w, &return_type), |_, _, _| format!("function requires a return type")),
-                            Req((&w, &group), |_, _, _| format!("function requires a function body"))
+                            Req((&w, &return_type), |_, _, _| format!("(func_rule) function requires a return type")),
+                            Req((&w, &group), |_, _, _| format!("(func_rule) function requires a function body"))
                         ),
-                        |_, ident_span, _| format!("{}: expected function parameters and body after function identifier", ident_span)
+                        |_, ident_span, _| format!("{}: (func_rule) expected function parameters and body after function identifier", ident_span)
                     )
                 ),
-                |_, fn_span, _| format!("{}: expected correct function syntax after 'fn' keyword", fn_span))),
+                |_, fn_span, _| format!("{}: (func_rule) expected correct function syntax after 'fn' keyword", fn_span))),
             |(span, (fn_span, (_, (id_span, (_, (_oparen, (_, params, _), _cparen), (_, ret_type), (_, body))))))| {
                 Func {
                     span,

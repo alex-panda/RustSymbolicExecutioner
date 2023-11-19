@@ -54,7 +54,7 @@ impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos,
 }
 
 macro_rules! impl_one_of {
-    ($num_children: tt, $name: ident $(, $num: tt)+) => {
+    ($num_children: tt, $name: tt, $($num: tt,)+) => {
         paste! {
             #[allow(non_snake_case)]
             pub fn [<OneOf $name>]<Child1 $(, [<Child $num>])*, Ok1 $(,[<Ok $num>])*, Err: From<AllChildrenFailedError<Pos, Err, $num_children>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>(child1: Child1 $(,[<child $num>]: [<Child $num>])*) -> [<OneOf $name Node>]<Child1 $(, [<Child $num>])*, Ok1 $(, [<Ok $num>])*, Err, Store, Pos, V> {
@@ -133,11 +133,11 @@ macro_rules! impl_one_of {
     };
 }
 
-impl_one_of!(2, Two  , 2);
-impl_one_of!(3, Three, 2, 3);
-impl_one_of!(4, Four , 2, 3, 4);
-impl_one_of!(5, Five , 2, 3, 4, 5);
-impl_one_of!(6, Six  , 2, 3, 4, 5, 6);
-impl_one_of!(7, Seven, 2, 3, 4, 5, 6, 7);
-impl_one_of!(8, Eight, 2, 3, 4, 5, 6, 7, 8);
-impl_one_of!(9, Nine , 2, 3, 4, 5, 6, 7, 8, 9);
+impl_one_of!(2, 2, 2,);
+impl_one_of!(3, 3, 2, 3,);
+impl_one_of!(4, 4, 2, 3, 4,);
+impl_one_of!(5, 5, 2, 3, 4, 5,);
+impl_one_of!(6, 6, 2, 3, 4, 5, 6,);
+impl_one_of!(7, 7, 2, 3, 4, 5, 6, 7,);
+impl_one_of!(8, 8, 2, 3, 4, 5, 6, 7, 8,);
+impl_one_of!(9, 9, 2, 3, 4, 5, 6, 7, 8, 9,);

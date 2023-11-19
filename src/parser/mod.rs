@@ -1,3 +1,7 @@
+pub mod new_parser;
+
+pub mod parser;
+
 mod node;
 pub use node::*;
 
@@ -24,5 +28,3 @@ pub use parse_store::*;
 
 mod node_zst;
 pub use node_zst::*;
-
-pub mod parser;

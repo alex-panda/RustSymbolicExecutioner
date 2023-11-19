@@ -30,13 +30,3 @@ impl <'a, Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Chil
         (**self).parse_span(store, pos)
     }
 }
-
-impl <'a, Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V> + ?Sized> ParseNode<Ok, Err, Store, Pos, V> for &'a mut Child {
-    fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Ok, Err, Pos> {
-        (**self).parse(store, pos)
-    }
-
-    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<crate::parser::Span<Pos>, Err, Pos> {
-        (**self).parse_span(store, pos)
-    }
-}
