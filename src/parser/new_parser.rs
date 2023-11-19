@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::Deref};
+use std::fmt::Display;
 
 use super::*;
 
@@ -41,8 +41,7 @@ impl Display for PPos {
 }
 
 impl ParsePos for PPos {
-    type Key = usize;
-    fn key(&self) -> Self::Key {
+    fn key(&self) -> usize {
         self.index
     }
 }
@@ -2426,6 +2425,18 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     let punctuation = punctuation_rule.din();
     let macro_match = macro_match_rule.din();
 
+    // whitespace
+
+    // a single white-space character
+    let wc = SpanOf(OneOf2(0..=32u32, 127u32));
+    // zero or more whitespace
+    let w = SpanOf(ZeroOrMore(wc.clone()));
+    // one or more whitespace
+    let o = SpanOf(OneOrMore(wc.clone()));
+
+    let wc = &wc;
+    let w = &w;
+    let o = &o;
 
     // --- Tokens ---
 
@@ -2437,24 +2448,24 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     delimiter_rule.set(MapV(
         OneOf3(
-            ('(', ZeroOrMore(token_tree), ')'),
-            ('[', ZeroOrMore(token_tree), ']'),
-            ('{', ZeroOrMore(token_tree), '}'),
+            ('(', w, ZeroOrMore(token_tree), w, ')'),
+            ('[', w, ZeroOrMore(token_tree), w, ']'),
+            ('{', w, ZeroOrMore(token_tree), w, '}'),
         ),
         |res| {
             use AnyOf3::*;
             match res {
-                Child1((_, trees, _)) => trees,
-                Child2((_, trees, _)) => trees,
-                Child3((_, trees, _)) => trees,
+                Child1((_, _, trees, _, _)) => trees,
+                Child2((_, _, trees, _, _)) => trees,
+                Child3((_, _, trees, _, _)) => trees,
             }
         }
     ));
 
     token_rule.set(MapV(
         SpanOf(OneOf2(
-            punctuation_rule,
-            delimiter_rule
+            punctuation,
+            delimiter
         )),
         |span| { RToken { span } }
     ));
@@ -2478,14 +2489,14 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     trait_object_type_rule.set(MapV(
-        Spanned((Maybe("dyn"), type_param_bounds)),
-        |(span, (_, bounds))| {
+        Spanned((Maybe("dyn"), o, type_param_bounds)),
+        |(span, (_, _, bounds))| {
             RTraitObjType { span }
         }
     ));
     trait_object_type_one_bound_rule.set(MapV(
-        Spanned((Maybe("dyn"), trait_bound)),
-        |(span, (_, bounds))| {
+        Spanned((Maybe("dyn"), o, trait_bound)),
+        |(span, (_, _, bounds))| {
             RTraitObjType { span }
         }
     ));
@@ -2533,24 +2544,24 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     parenthesized_type_rule.set(MapV(
         Surround(
             '(',
-            _type,
+            (w, _type, w),
             ')',
             |_, _, e| e,
             |_, start_span, _, _| panic(start_span, "parenthesized_type", "missing ending parenthesis")
         ),
-        |(_, ty, _)| ty
+        |(_, (_, ty, _), _)| ty
     ));
 
     impl_trait_type_rule.set(MapV(
-        Spanned(("impl", type_param_bounds)),
-        |(span, (_, bounds))| {
+        Spanned(("impl", o, type_param_bounds)),
+        |(span, (_, _, bounds))| {
             RImplTraitType { span }
         }
     ));
 
     impl_trait_type_one_bound_rule.set(MapV(
-        Spanned(("impl", Spanned(trait_bound))),
-        |(span, (_, (tspan, bound)))| {
+        Spanned(("impl", o, trait_bound)),
+        |(span, (_, _, _))| {
             RImplTraitType {
                 span,
             }
@@ -2585,23 +2596,24 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     type_path_fn_rule.set(MapV(Spanned((
             Surround(
                 '(',
-                Maybe(type_path_fn_inputs),
+                (w, Maybe(type_path_fn_inputs), w),
                 ')',
                 |_, _, e| e,
                 |_, start_span, _, _| panic(start_span, "type_path_fn", "expected closed parenthesis somewhere after this open parenthesis")
             ),
             Maybe((
                 "->",
+                w,
                 _type
             ))
         )),
-        |(span, ((_, inputs, _), ret))| { RTypePathFn { span, inputs, ret: ret.map(|(_, ty)|ty) } }
+        |(span, ((_, (_, inputs, _), _), ret))| { RTypePathFn { span, inputs, ret: ret.map(|(_, _, ty)|ty) } }
     ));
 
     type_path_fn_inputs_rule.set(MapV(
-        Spanned((_type, ZeroOrMore((',', _type)), Maybe(','))),
+        Spanned((_type, ZeroOrMore((w, ',', w, _type)), Maybe((w, ',')))),
         |(span, (t1, types, _))| {
-            let mut types: Vec<RType> = types.into_iter().map(|(_, ty)|ty).collect();
+            let mut types: Vec<RType> = types.into_iter().map(|(_, _, _, ty)|ty).collect();
             types.insert(0, t1);
             RTypeList { span, types }
         }
@@ -2609,14 +2621,14 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     tuple_type_rule.set(MapV(
         Spanned(OneOf2(
-            ('(', ')'),
-            ('(', OneOrMore((_type, ',')), Maybe(_type), ')')
+            ('(', w, ')'),
+            ('(', w, OneOrMore((_type, w, ',', w)), Maybe(_type), w, ')')
         )),
         |(span, two)| {
             use AnyOf2::*;
             match two {
                 Child1(_) => RTupleType { span, children: Vec::new() },
-                Child2((_, types, f_type, _)) => {
+                Child2((_, _, types, f_type, _, _)) => {
                     RTupleType { span, children: Vec::new() }
                 },
             }
@@ -2629,8 +2641,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     raw_pointer_type_rule.set(MapV(
-        Spanned(('*', OneOf2("mut", "const"), type_no_bounds)),
-        |(span, (_, two, ty))| {
+        Spanned(('*', w, OneOf2("mut", "const"), w, type_no_bounds)),
+        |(span, (_, _, two, _, ty))| {
             RPtrType {
                 span,
                 mutable: match two {
@@ -2643,11 +2655,11 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     reference_type_rule.set(MapV(
-        Spanned(('&', Maybe(lifetime), Maybe("mut"), type_no_bounds)),
-        |(span, (_, lifetime, m, ty))| {
+        Spanned(('&', w, Maybe((lifetime, o)), Maybe(("mut", o)), type_no_bounds)),
+        |(span, (_, _, lifetime, m, ty))| {
             RRefType {
                 span,
-                lifetime,
+                lifetime: lifetime.map(|(l, _)|l),
                 mutable: m.is_some(),
                 ty
             }
@@ -2655,13 +2667,13 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     array_type_rule.set(MapV(
-        Spanned(('[', _type, ';', expression, ']')),
-        |(span, (_, child, _, expr, _))| { RArrayType { span, child, expr } }
+        Spanned(('[', w, _type, w, ';', w, expression, w, ']')),
+        |(span, (_, _, child, _, _, _, expr, _, _))| { RArrayType { span, child, expr } }
     ));
 
     slice_type_rule.set(MapV(
-        Spanned(('[', _type, ']')),
-        |(span, (_, child, _))| { RSliceType { span, child } }
+        Spanned(('[', w, _type, w, ']')),
+        |(span, (_, _, child, _, _))| { RSliceType { span, child } }
     ));
 
     inferred_type_rule.set(MapV(
@@ -2728,18 +2740,18 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     generic_args_rule.set(MapV(
         Spanned(OneOf2(
-            ('<', '>'),
-            ('<', ZeroOrMore((generic_arg, ',')), generic_arg, Maybe(','), '>')
+            ('<', w, '>'),
+            ('<', w, ZeroOrMore((generic_arg, w, ',', w)), generic_arg, w, Maybe((',', w)), '>')
         )),
         |(span, two)| {
             use AnyOf2::*;
             match two {
                 Child1(_) => RGenericArgs { span, args: Vec::new() },
-                Child2((_, args, arg_final, _, _)) => {
+                Child2((_, _, args, arg_final, _, _, _)) => {
                     RGenericArgs {
                         span,
                         args: {
-                            let mut args: Vec<RGenericArg> = args.into_iter().map(|(arg, _)|arg).collect();
+                            let mut args: Vec<RGenericArg> = args.into_iter().map(|(arg, ..)|arg).collect();
                             args.push(arg_final);
                             args
                         }
@@ -2771,7 +2783,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         OneOf4(
             block_expression,
             literal_expression,
-            Spanned(('-', literal_expression)),
+            Spanned(('-', w, literal_expression)),
             simple_path_segment,
         ),
         |res| {
@@ -2782,17 +2794,17 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                     match res {
                         Child1(v) => Okay(RGenericArgsConst::Block(v)),
                         Child2(v) => Okay(RGenericArgsConst::Lit(v)),
-                        Child3((span, (neg, lit))) => {
+                        Child3((span, (neg, _, lit))) => {
                             Panic(match lit {
-                                RLit::Char(lit) => panic(span, "generic_args_const", "`Char` cannot have a sign"),
-                                RLit::String(lit) => panic(span, "generic_args_const", "`String` cannot have a sign"),
-                                RLit::RawString(lit) => panic(span, "generic_args_const", "`RawString` cannot have a sign"),
-                                RLit::Byte(lit) => panic(span, "generic_args_const", "`ByteString` cannot have a sign"),
-                                RLit::ByteString(lit) => panic(span, "generic_args_const", "`ByteString` cannot have a sign"),
-                                RLit::RawByteString(lit) => panic(span, "generic_args_const", "`RawByteString` cannot have a sign"),
+                                RLit::Char(_) => panic(span, "generic_args_const", "`Char` cannot have a sign"),
+                                RLit::String(_) => panic(span, "generic_args_const", "`String` cannot have a sign"),
+                                RLit::RawString(_) => panic(span, "generic_args_const", "`RawString` cannot have a sign"),
+                                RLit::Byte(_) => panic(span, "generic_args_const", "`ByteString` cannot have a sign"),
+                                RLit::ByteString(_) => panic(span, "generic_args_const", "`ByteString` cannot have a sign"),
+                                RLit::RawByteString(_) => panic(span, "generic_args_const", "`RawByteString` cannot have a sign"),
                                 RLit::Integer(lit) => return Okay(RGenericArgsConst::SLit(RSLit::Integer(RSIntLit { span: span, neg: true, lit }))),
                                 RLit::Float(lit) => return Okay(RGenericArgsConst::SLit(RSLit::Float(RSFloatLit { span: span, neg: true, lit }))),
-                                RLit::Bool(lit) => panic(span, "generic_args_const", "`Bool` cannot have a sign"),
+                                RLit::Bool(_) => panic(span, "generic_args_const", "`Bool` cannot have a sign"),
                             })
                         },
                         Child4(v) => Okay(RGenericArgsConst::PathSeg(v)),
@@ -2802,17 +2814,17 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                     match res {
                         Child1(v) => OkayAdvance(RGenericArgsConst::Block(v), adv),
                         Child2(v) => OkayAdvance(RGenericArgsConst::Lit(v), adv),
-                        Child3((span, (neg, lit))) => {
+                        Child3((span, (neg, _, lit))) => {
                             Panic(match lit {
-                                RLit::Char(lit) => panic(span, "generic_args_const", "`Char` cannot have a sign"),
-                                RLit::String(lit) => panic(span, "generic_args_const", "`String` cannot have a sign"),
-                                RLit::RawString(lit) => panic(span, "generic_args_const", "`RawString` cannot have a sign"),
-                                RLit::Byte(lit) => panic(span, "generic_args_const", "`ByteString` cannot have a sign"),
-                                RLit::ByteString(lit) => panic(span, "generic_args_const", "`ByteString` cannot have a sign"),
-                                RLit::RawByteString(lit) => panic(span, "generic_args_const", "`RawByteString` cannot have a sign"),
+                                RLit::Char(_) => panic(span, "generic_args_const", "`Char` cannot have a sign"),
+                                RLit::String(_) => panic(span, "generic_args_const", "`String` cannot have a sign"),
+                                RLit::RawString(_) => panic(span, "generic_args_const", "`RawString` cannot have a sign"),
+                                RLit::Byte(_) => panic(span, "generic_args_const", "`ByteString` cannot have a sign"),
+                                RLit::ByteString(_) => panic(span, "generic_args_const", "`ByteString` cannot have a sign"),
+                                RLit::RawByteString(_) => panic(span, "generic_args_const", "`RawByteString` cannot have a sign"),
                                 RLit::Integer(lit) => return OkayAdvance(RGenericArgsConst::SLit(RSLit::Integer(RSIntLit { span: span, neg: true, lit })), adv),
                                 RLit::Float(lit) => return OkayAdvance(RGenericArgsConst::SLit(RSLit::Float(RSFloatLit { span: span, neg: true, lit })), adv),
-                                RLit::Bool(lit) => panic(span, "generic_args_const", "`Bool` cannot have a sign"),
+                                RLit::Bool(_) => panic(span, "generic_args_const", "`Bool` cannot have a sign"),
                             })
                         },
                         Child4(v) => OkayAdvance(RGenericArgsConst::PathSeg(v), adv),
@@ -2825,8 +2837,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     generic_args_binding_rule.set(MapV(
-        Spanned((identifier, '=', _type)),
-        |(span, (ident, _, ty))| { RGenericArgsBinding { span, ident, ty } }
+        Spanned((identifier, w, '=', w, _type)),
+        |(span, (ident, _, _, _, ty))| { RGenericArgsBinding { span, ident, ty } }
     ));
 
     // - QUALIFIED PATH -
@@ -2843,9 +2855,9 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     qualified_path_type_rule.set(MapV(
-        Spanned(('<', _type, Maybe(("as", type_path)), '>')),
-        |(span, (_, ty, maybe_ty, _))| {
-            RQualPathType { ty, as_ty: maybe_ty.map(|(_, ty)|ty) }
+        Spanned(('<', w, _type, Maybe((o, "as", o, type_path)), w, '>')),
+        |(span, (_, _, ty, maybe_ty, _, _))| {
+            RQualPathType { ty, as_ty: maybe_ty.map(|(_, _, _, ty)|ty) }
         }
     ));
 
@@ -2863,17 +2875,21 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // - FUNCTION POINTER TYPES -
 
     bare_function_type_rule.set(MapV(
-        SpanOf((Maybe(for_lifetimes), function_type_qualifiers, "fn", '(', Maybe(function_parameters_maybe_named_variadic), ')', Maybe(bare_function_return_type))),
+        SpanOf((Maybe(for_lifetimes), function_type_qualifiers, "fn", o, '(', w, Maybe(function_parameters_maybe_named_variadic), w, ')', Maybe((w, bare_function_return_type)))),
         |span| { RBareFnType { span } }
     ));
 
     function_type_qualifiers_rule.set(
-        (Maybe("unsafe"), Maybe(("extern", Maybe(abi))))
+        OneOf3(
+            ("unsafe", o, "extern", Maybe((o, abi))),
+            ("extern", Maybe((o, abi))),
+            ()
+        )
     );
 
     bare_function_return_type_rule.set(MapV(
-        ("->", type_no_bounds),
-        |(_, ty)| ty
+        ("->", w, type_no_bounds),
+        |(_, _, ty)| ty
     ));
 
     function_parameters_maybe_named_variadic_rule.set(
@@ -2881,15 +2897,15 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     );
 
     maybe_named_function_parameters_rule.set(
-        (maybe_named_param, ZeroOrMore((',', maybe_named_param)), Maybe(','))
+        (maybe_named_param, ZeroOrMore((w, ',', w, maybe_named_param)), Maybe((w, ',')))
     );
 
     maybe_named_param_rule.set(
-        (ZeroOrMore(outer_attribute), Maybe((OneOf2(identifier, '_'), ':')), _type)
+        (ZeroOrMore((outer_attribute, w)), Maybe((w, OneOf2(identifier, '_'), w, ':', w)), _type)
     );
 
     maybe_named_function_parameters_variadic_rule.set(
-        (ZeroOrMore((maybe_named_param, ',')), maybe_named_param, ',', ZeroOrMore(outer_attribute), "...")
+        (ZeroOrMore((maybe_named_param, w, ',')), w, maybe_named_param, w, ',', ZeroOrMore((w, outer_attribute)), w, "...")
     );
 
     // - MACRO INVOCATION -
@@ -2900,16 +2916,16 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     delim_token_tree_rule.set(MapV(Spanned(OneOf3(
-            ('(', ZeroOrMore(token_tree), ')'),
-            ('[', ZeroOrMore(token_tree), ']'),
-            ('{', ZeroOrMore(token_tree), '}'),
+            ('(', ZeroOrMore((w, token_tree)), w, ')'),
+            ('[', ZeroOrMore((w, token_tree)), w, ']'),
+            ('{', ZeroOrMore((w, token_tree)), w, '}'),
         )),
         |(span, three)| {
             use AnyOf3::*;
             match three {
-                Child1((_, trees, _)) => RDelimTokenTree { span, trees },
-                Child2((_, trees, _)) => RDelimTokenTree { span, trees },
-                Child3((_, trees, _)) => RDelimTokenTree { span, trees },
+                Child1((_, trees, _, _)) => RDelimTokenTree { span, trees: trees.into_iter().map(|(_, t)|t).collect() },
+                Child2((_, trees, _, _)) => RDelimTokenTree { span, trees: trees.into_iter().map(|(_, t)|t).collect() },
+                Child3((_, trees, _, _)) => RDelimTokenTree { span, trees: trees.into_iter().map(|(_, t)|t).collect() },
             }
         }
     ));
@@ -2927,16 +2943,16 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     macro_invocation_semi_rule.set(MapV(
         Spanned(OneOf3(
-            (simple_path, '!', '(', ZeroOrMore(token_tree), ')', ';'),
-            (simple_path, '!', '[', ZeroOrMore(token_tree), ']', ';'),
-            (simple_path, '!', '{', ZeroOrMore(token_tree), '}'),
+            (simple_path, '!', '(', ZeroOrMore((w, token_tree)), w, ')', ';'),
+            (simple_path, '!', '[', ZeroOrMore((w, token_tree)), w, ']', ';'),
+            (simple_path, '!', '{', ZeroOrMore((w, token_tree)), w, '}'),
         )),
         |(span, three)| {
             use AnyOf3::*;
             match three {
-                Child1((path, _, _, trees, _, _)) => RMacroInvocation { span, path, trees },
-                Child2((path, _, _, trees, _, _)) => RMacroInvocation { span, path, trees },
-                Child3((path, _, _, trees, _   )) => RMacroInvocation { span, path, trees },
+                Child1((path, _, _, trees, _, _, _)) => RMacroInvocation { span, path, trees: trees.into_iter().map(|(_, t)|t).collect() },
+                Child2((path, _, _, trees, _, _, _)) => RMacroInvocation { span, path, trees: trees.into_iter().map(|(_, t)|t).collect() },
+                Child3((path, _, _, trees, _, _   )) => RMacroInvocation { span, path, trees: trees.into_iter().map(|(_, t)|t).collect() },
             }
         }
     ));
@@ -3452,33 +3468,33 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     macro_rules_rule.set(MapV(
-        Spanned((macro_rule, ZeroOrMore((';', macro_rule)), Maybe(';'))),
+        Spanned((macro_rule, ZeroOrMore((w, ';', w, macro_rule)), Maybe((w, ';')))),
         |(span, (rule, rules, _))| {
-            let mut rules: Vec<RMacroRule> = rules.into_iter().map(|(_, r)|r).collect();
+            let mut rules: Vec<RMacroRule> = rules.into_iter().map(|(_, _, _, r)|r).collect();
             rules.push(rule);
             RMacroRules { span, rules, }
         }
     ));
 
     macro_rule_rule.set(MapV(
-        Spanned((macro_match, "=>", macro_transcriber)),
-        |(span, (macro_match, _, macro_transcriber))| {
+        Spanned((macro_match, w, "=>", w, macro_transcriber)),
+        |(span, (macro_match, _, _, _, macro_transcriber))| {
             RMacroRule { span, macro_match, macro_transcriber }
         }
     ));
 
     macro_matcher_rule.set(MapV(
         Spanned(OneOf3(
-            ('(', ZeroOrMore(macro_match), ')'),
-            ('[', ZeroOrMore(macro_match), ']'),
-            ('{', ZeroOrMore(macro_match), '}'),
+            ('(', ZeroOrMore((w, macro_match)), w, ')'),
+            ('[', ZeroOrMore((w, macro_match)), w, ']'),
+            ('{', ZeroOrMore((w, macro_match)), w, '}'),
         )),
         |(span, three)| {
             use AnyOf3::*;
             match three {
-                Child1((_, matches, _)) => RMacroMatcher { span, matches },
-                Child2((_, matches, _)) => RMacroMatcher { span, matches },
-                Child3((_, matches, _)) => RMacroMatcher { span, matches },
+                Child1((_, matches, _, _)) => RMacroMatcher { span, matches: matches.into_iter().map(|(_, m)|m).collect() },
+                Child2((_, matches, _, _)) => RMacroMatcher { span, matches: matches.into_iter().map(|(_, m)|m).collect() },
+                Child3((_, matches, _, _)) => RMacroMatcher { span, matches: matches.into_iter().map(|(_, m)|m).collect() },
             }
         }
     ));
@@ -3637,8 +3653,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     configuration_all_rule.set(MapV(
-        Spanned(("all", '(', Maybe(configuration_predicate_list), ')')),
-        |(span, (_, _, list, _))| {
+        Spanned(("all", '(', w, Maybe(configuration_predicate_list), w, ')')),
+        |(span, (_, _, _, list, _, _))| {
             match list {
                 Some(list) => {
                     RConfigPred::All {
@@ -3657,8 +3673,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     configuration_any_rule.set(MapV(
-        Spanned(("any", '(', Maybe(configuration_predicate_list), ')')),
-        |(span, (_, _, list, _))| {
+        Spanned(("any", '(', w, Maybe(configuration_predicate_list), w, ')')),
+        |(span, (_, _, _, list, _, _))| {
             match list {
                 Some(list) => {
                     RConfigPred::Any {
@@ -3676,8 +3692,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         }
     ));
     configuration_not_rule.set(MapV(
-        Spanned(("not", '(', configuration_predicate, ')')),
-        |(span, (_, _, pred, _))| {
+        Spanned(("not", '(', w, configuration_predicate, w, ')')),
+        |(span, (_, _, _, pred, _, _))| {
             RConfigPred::Not {
                 span,
                 pred: Box::new(pred)
@@ -3686,28 +3702,28 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     configuration_predicate_list_rule.set(MapV(
-        (configuration_predicate, ZeroOrMore((',', configuration_predicate)), Maybe(',')),
+        (configuration_predicate, ZeroOrMore((w, ',', w, configuration_predicate)), Maybe((w, ','))),
         |(first, later, _)| {
-            let mut list: Vec<RConfigPred> = later.into_iter().map(|v|v.1).collect();
+            let mut list: Vec<RConfigPred> = later.into_iter().map(|v|v.3).collect();
             list.insert(0, first);
             list
         }
     ));
 
     cfg_attribute_rule.set(MapV(
-        ("cfg(", configuration_predicate, ')'),
-        |(_, pred, _)| pred
+        ("cfg(", w, configuration_predicate, w, ')'),
+        |(_, _, pred, _, _)| pred
     ));
 
     cfg_attr_attribute_rule.set(MapV(
-        ("cfg_attr(", configuration_predicate, ',', Maybe(cfg_attrs), ')'),
-        |(_, first, _, follow, _)| {
-
+        Spanned(("cfg_attr(", w, configuration_predicate, w, ',', Maybe(cfg_attrs), w, ')')),
+        |(span, (_, _, first, _, _, follow, _, _))| {
+            span
         }
     ));
 
     cfg_attrs_rule.set(
-        (attr, ZeroOrMore((',', attr)), Maybe(','))
+        (attr, ZeroOrMore((w, ',', attr)), Maybe((w, ',')))
     );
 
     // --- ITEMS ---
@@ -3783,8 +3799,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     module_rule.set(MapV(
         Spanned(OneOf2(
-            (Maybe("unsafe"), "mod", identifier, ';'),
-            (Maybe("unsafe"), "mod", identifier, '{',
+            (Maybe(("unsafe", w)), "mod", w, identifier, w, ';'),
+            (Maybe(("unsafe", w)), "mod", w, identifier, w, '{',
                 ZeroOrMore(inner_attribute),
                 ZeroOrMore(item),
             '}'),
@@ -3792,8 +3808,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         |(span, two)| {
             use AnyOf2::*;
             match two {
-                Child1((un, _, ident, _)) => RMod { span, is_unsafe: un.is_some(), ident, items: Vec::new() },
-                Child2((un, _, ident, _, _, items, _)) => RMod { span, is_unsafe: un.is_some(), ident, items },
+                Child1((un, _, _, ident, _, _)) => RMod { span, is_unsafe: un.is_some(), ident, items: Vec::new() },
+                Child2((un, _, _, ident, _, _, _, items, _)) => RMod { span, is_unsafe: un.is_some(), ident, items },
             }
         }
     ));
@@ -3801,12 +3817,12 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // --- EXTERN CRATE DECLARATIONS ---
 
     extern_crate_rule.set(MapV(
-        Spanned(("extern", "crate", crate_ref, Maybe(as_clause), ';')),
-        |(span, (_, _, crate_ref, as_clause, _))| {
+        Spanned(("extern", o, "crate", o, crate_ref, o, Maybe(as_clause), w, ';')),
+        |(span, (_, _, _, _, crate_ref, _, as_clause, _, _))| {
             RExternCrate {
                 span,
                 crate_ref,
-                as_clause: as_clause.map(|(_, ident)|ident)
+                as_clause: as_clause.map(|(_, _, ident)|ident)
             }
         }
     ));
@@ -3819,21 +3835,21 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     );
 
     as_clause_rule.set(
-        ("as", SpanOf(OneOf2(identifier, '_')))
+        ("as", o, SpanOf(OneOf2(identifier, '_')))
     );
 
     // --- USE DECLARATIONS ---
 
     use_declaration_rule.set(MapV(
-        Spanned(("use", use_tree, ';')),
-        |(span, (_, tree, _))| { RUseDecl { span, tree } }
+        Spanned(("use", o, use_tree, w, ';')),
+        |(span, (_, _, tree, _, _))| { RUseDecl { span, tree } }
     ));
 
     use_tree_rule.set(MapV(
         Spanned(OneOf3(
             (Maybe((Maybe(simple_path), "::")), '*'),
-            (Maybe((Maybe(simple_path), "::")), '{', Maybe((use_tree, ZeroOrMore((',', use_tree)), Maybe(','))), '}'),
-            (simple_path, Maybe(("as", SpanOf(OneOf2(identifier, '_')))))
+            (Maybe((Maybe(simple_path), "::")), w, '{', w, Maybe((use_tree, ZeroOrMore((w, ',', w, use_tree)), Maybe((w, ',')))), w, '}'),
+            (simple_path, Maybe((o, "as", o, SpanOf(OneOf2(identifier, '_')))))
         )),
         |(span, three)| {
             use AnyOf3::*;
@@ -3847,7 +3863,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                         }
                     }
                 },
-                Child2((path, _, trees, _)) => {
+                Child2((path, _, _, _, trees, _, _)) => {
                     RUseTree::List {
                         span,
                         path: match path.map(|(p, _)|p) {
@@ -3855,7 +3871,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                             None => None
                         },
                         list: trees.map(|(tree, trees, _)| {
-                            let mut trees: Vec<RUseTree> = trees.into_iter().map(|(_, t)|t).collect();
+                            let mut trees: Vec<RUseTree> = trees.into_iter().map(|(_, _, _, t)|t).collect();
                             trees.insert(0, tree);
                             trees
                         }).unwrap_or_else(||Vec::new())
@@ -3865,7 +3881,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                     RUseTree::As {
                         span,
                         path,
-                        ident: ident.map(|(_, ident)|ident)
+                        ident: ident.map(|(_, _, _, ident)|ident)
                     }
                 }
             }
@@ -3875,26 +3891,30 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // --- FUNCTIONS ---
 
     function_rule.set(MapV(Spanned((
-            (Maybe("const"), Maybe("async"), Maybe("unsafe"), Maybe(("extern", Maybe(abi)))),
+            (Maybe(("const", w)), Maybe(("async", w)), Maybe(("unsafe", w)), Maybe(("extern", w, Maybe((abi, w))))),
             "fn",
+            o,
             identifier,
             Spanned(Maybe(generic_params)),
             '(',
-            Spanned(Maybe(function_parameters)),
+            Spanned(Maybe((w, function_parameters, w))),
             ')',
+            w,
             Maybe(function_return_type),
+            w,
             Maybe(where_clause),
+            w,
             OneOf2(block_expression, ';')
         )),
-        |(span, ((c, a, u, e), _, ident, (g_span, generics), _, (p_span, params), _, ret_type, where_clause, body))| {
+        |(span, ((c, a, u, e), _, _, ident, (g_span, generics), _, (p_span, params), _, _, ret_type, w, where_clause, _, body))| {
             RFn {
                 span,
                 is_const: c.is_some(),
                 is_async: a.is_some(),
                 is_unsafe: u.is_some(),
                 is_extern: {
-                    match e.map(|(_, abi)|abi) {
-                        Some(abi) => abi,
+                    match e.map(|(_, _, abi)|abi) {
+                        Some(abi) => abi.map(|(abi, _)|abi),
                         None => None
                     }
                 },
@@ -3907,7 +3927,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                 },
                 params: {
                     match params {
-                        Some(p) => p,
+                        Some((_, p, _)) => p,
                         None => RFnParams { span: p_span, self_param: None, params: Vec::new() },
                     }
                 },
@@ -4177,8 +4197,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // --- ENUMERATIONS ---
 
     enumeration_rule.set(MapV(SpanOf((
-            "enum", identifier, Maybe(generic_params), Maybe(where_clause), '{',
-            Maybe(enum_items),
+            "enum", o, identifier, Maybe((o, generic_params)), Maybe((o, where_clause)), '{', w,
+            Maybe(enum_items), w,
             '}'
         )),
         |span| { REnum { span } }
@@ -4197,11 +4217,11 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     )));
 
     enum_item_tuple_rule.set(SpanOf(
-        ('(', Maybe(tuple_fields), ')')
+        ('(', w, Maybe(tuple_fields), w, ')')
     ));
 
     enum_item_struct_rule.set(SpanOf(
-        ('{', Maybe(struct_fields), '}')
+        ('{', w, Maybe(struct_fields), w, '}')
     ));
 
     enum_item_discriminant_rule.set(SpanOf(
@@ -4211,11 +4231,11 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // --- UNIONS ---
 
     _union_rule.set(MapV(Spanned((
-            "union", identifier, Spanned(Maybe(generic_params)), Maybe(where_clause), '{',
-            struct_fields,
+            "union", o, identifier, w, Spanned(Maybe(generic_params)), Maybe(where_clause), w, '{', w,
+            struct_fields, w,
             '}'
         )),
-        |(span, (_, ident, (gspan, generics), clause, _, fields, _))| {
+        |(span, (_, _, ident, _, (gspan, generics), clause, _, _, _, fields, _, _))| {
             RUnion {
                 span,
                 ident,
@@ -4234,13 +4254,13 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // --- CONSTANT ITEMS ---
     
     constant_item_rule.set(MapV(
-        Spanned(("const", SpanOf(OneOf2(identifier, '_')), ':', _type, Maybe(('=', expression)), ';')),
-        |(span, (_, ident, _, ty, maybe_expr, _))| {
+        Spanned(("const", w, SpanOf(OneOf2(identifier, '_')), w, ':', w, _type, w, Maybe(('=', w, expression, w)), ';')),
+        |(span, (_, _, ident, _, _, _, ty, _, maybe_expr, _))| {
             RConstItem {
                 span,
                 ident,
                 ty,
-                expr: maybe_expr.map(|(_, expr)|expr)
+                expr: maybe_expr.map(|(_, _, expr, _)|expr)
             }
         }
     ));
@@ -4248,14 +4268,14 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // --- STATIC ITEMS ---
 
     static_item_rule.set(MapV(
-        Spanned(("static", Maybe("mut"), identifier, ':', _type, Maybe(( '=', expression)), ';')),
-        |(span, (_, m, ident, _, ty, maybe_expr, _))| {
+        Spanned(("static", w, Maybe(("mut", w)), identifier, w, ':', w, _type, Maybe(( '=', w, expression, w)), ';')),
+        |(span, (_, _, m, ident, _, _, _, ty, maybe_expr, _))| {
             RStaticItem {
                 span,
                 mutable: m.is_some(),
                 ident,
                 ty,
-                expr: maybe_expr.map(|(_, expr)|expr)
+                expr: maybe_expr.map(|(_, _, expr, _)|expr)
             }
         }
     ));
@@ -4263,9 +4283,9 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // --- TRAITS ---
 
     _trait_rule.set(MapV(SpanOf((
-            Maybe("unsafe"), "trait", identifier, Maybe(generic_params), Maybe(( ":", Maybe(type_param_bounds))), Maybe(where_clause), '{',
-            ZeroOrMore(inner_attribute),
-            ZeroOrMore(associated_item),
+            Maybe(("unsafe", w)), "trait", w, identifier, Maybe(generic_params), Maybe((w, ":", w, Maybe((w, type_param_bounds)))), Maybe((w, where_clause)), w, '{', w,
+            ZeroOrMore(inner_attribute), w,
+            ZeroOrMore(associated_item), w,
             '}'
         )),
         |span| { RTrait { span } }
@@ -4279,34 +4299,36 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     inherent_impl_rule.set((
-        "impl", Maybe(generic_params), _type, Maybe(where_clause), '{',
-        ZeroOrMore(inner_attribute),
-        ZeroOrMore(associated_item),
+        "impl", w, Maybe(generic_params), w, _type, w, Maybe((where_clause, w)), '{', w,
+        ZeroOrMore(inner_attribute), w,
+        ZeroOrMore(associated_item), w,
         '}'
     ));
 
     trait_impl_rule.set((
-        Maybe("unsafe"), "impl", Maybe(generic_params), Maybe('!'), type_path, "for", _type,
-        Maybe(where_clause),
-        '{',
-        ZeroOrMore(inner_attribute),
-        ZeroOrMore(associated_item),
-        '}'
+        Maybe(("unsafe", w)), "impl", w, Maybe(generic_params), Maybe('!'), type_path, w, "for", w, _type, w,
+        Maybe(where_clause), w,
+        (
+            '{', w,
+            ZeroOrMore(inner_attribute), w,
+            ZeroOrMore(associated_item), w,
+            '}'
+        )
     ));
 
     // --- EXTERNAL BLOCKS ---
 
     extern_block_rule.set(MapV(Spanned((
-            Maybe("unsafe"), "extern", Maybe(abi), '{',
-            ZeroOrMore(inner_attribute),
-            ZeroOrMore(external_item),
+            Maybe(("unsafe", w)), "extern", w, Maybe((abi, w)), w, '{', w,
+            ZeroOrMore(inner_attribute), w,
+            ZeroOrMore(external_item), w,
             '}'
         )),
-        |(span, (u, _, abi, _, attrs, items, _))| {
+        |(span, (u, _, _, abi, _, _, _, attrs, _, items, _, _))| {
             RExternBlock {
                 span,
                 is_unsafe: u.is_some(),
-                abi,
+                abi: abi.map(|(a, _)|a),
                 attrs,
                 items,
             }
@@ -4334,18 +4356,18 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     generic_params_rule.set(MapV(
         Spanned(OneOf2(
-            ('<', '>'),
-            ('<', ZeroOrMore((generic_param, ',')), generic_param, Maybe(','), '>')
+            ('<', w, '>'),
+            ('<', ZeroOrMore((w, generic_param, w, ',')), w, generic_param, Maybe((w, ',')), w, '>')
         )),
         |(span, two)| {
             use AnyOf2::*;
             match two {
                 Child1(_) => RGenericParams { span, params: Vec::new() },
-                Child2((_, params, param, _, _)) => {
+                Child2((_, params, _, param, _, _, _)) => {
                     RGenericParams {
                         span,
                         params: {
-                            let mut params: Vec<RGenericParam> = params.into_iter().map(|(p,_)|p).collect();
+                            let mut params: Vec<RGenericParam> = params.into_iter().map(|(w, p, _, _)|p).collect();
                             params.push(param);
                             params
                         }
@@ -4739,12 +4761,12 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // - BLOCK_EXPRESSIONS -
 
     block_expression_rule.set(MapV(Spanned((
-            '{',
-            ZeroOrMore(inner_attribute),
-            Maybe(statements),
+            '{', w,
+            ZeroOrMore(inner_attribute), w,
+            Maybe(statements), w,
             '}'
         )),
-        |(span, (_, _, statements, _))| {
+        |(span, (_, _, _, _, statements, _, _))| {
             RBlockExpr { span, statements: statements.unwrap_or(Vec::new()) }
         }
     ));
@@ -4773,13 +4795,13 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     async_block_expression_rule.set(MapV(
-        Spanned(("async", Maybe("move"), block_expression)),
-        |(span, (_, mmove, block))| { RAsyncBlockExpr { span, is_move: mmove.is_some(), block } }
+        Spanned(("async", w, Maybe(("move", w)), block_expression)),
+        |(span, (_, _, mmove, block))| { RAsyncBlockExpr { span, is_move: mmove.is_some(), block } }
     ));
 
     unsafe_block_expression_rule.set(MapV(
-        Spanned(("unsafe", block_expression)),
-        |(span, (_, block))| { RUnsafeBlockExpr { span, block } }
+        Spanned(("unsafe", w, block_expression)),
+        |(span, (_, _, block))| { RUnsafeBlockExpr { span, block } }
     ));
 
     // - Operator Expressions -
@@ -4817,8 +4839,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     borrow_expression_rule.set(MapV(
-        Spanned(('&', Maybe('&'), Maybe("mut"), expression)),
-        |(span, (_, d, m, target))| {
+        Spanned(('&', Maybe('&'), Maybe((w, "mut")), w, expression)),
+        |(span, (_, d, m, _, target))| {
             if let Some(_) = d {
                 ROpExpr::BorrowBorrow { span, mutable: m.is_some(), target }
             } else {
@@ -4828,135 +4850,135 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     deref_expression_rule.set(MapV(
-        Spanned(('*', expression)),
-        |(span, (_, target))| { ROpExpr::Deref { span, target } }
+        Spanned(('*', w, expression)),
+        |(span, (_, _, target))| { ROpExpr::Deref { span, target } }
     ));
 
     error_propogation_expression_rule.set(MapV(
-        Spanned((expression, '?')),
-        |(span, (target, _))| { ROpExpr::ErrorProp { span, target } }
+        Spanned((expression, w, '?')),
+        |(span, (target, _, _))| { ROpExpr::ErrorProp { span, target } }
     ));
 
     negation_expression_rule.set(MapV(
         Spanned(OneOf2(
-            ('-', expression),
-            ('!', expression)
+            ('-', w, expression),
+            ('!', w, expression)
         )),
         |(span, two)| {
             use AnyOf2::*;
             match two {
-                Child1((_, target)) => ROpExpr::SubNegate { span, target },
-                Child2((_, target)) => ROpExpr::SubNegate { span, target },
+                Child1((_, _, target)) => ROpExpr::SubNegate { span, target },
+                Child2((_, _, target)) => ROpExpr::NotNegate { span, target },
             }
         }
     ));
 
     arithmetic_or_logical_expression_rule.set(MapV(
         Spanned(OneOf9(
-            (expression, '+', expression),
-            (expression, '-', expression),
-            (expression, '*', expression),
-            (expression, '/', expression),
-            (expression, '%', expression),
-            (expression, '&', expression),
-            (expression, '|', expression),
-            (expression, '^', expression),
+            (expression, w, '+', w, expression),
+            (expression, w, '-', w, expression),
+            (expression, w, '*', w, expression),
+            (expression, w, '/', w, expression),
+            (expression, w, '%', w, expression),
+            (expression, w, '&', w, expression),
+            (expression, w, '|', w, expression),
+            (expression, w, '^', w, expression),
             OneOf2(
-                (expression, "<<", expression),
-                (expression, ">>", expression),
+                (expression, w, "<<", w, expression),
+                (expression, w, ">>", w, expression),
             ),
         )),
         |(span, nine)| {
             use AnyOf9::*;
             match nine {
-                Child1((left, _, right)) => ROpExpr::Add { span, left, right },
-                Child2((left, _, right)) => ROpExpr::Sub { span, left, right },
-                Child3((left, _, right)) => ROpExpr::Mul { span, left, right },
-                Child4((left, _, right)) => ROpExpr::Div { span, left, right },
-                Child5((left, _, right)) => ROpExpr::Mod { span, left, right },
-                Child6((left, _, right)) => ROpExpr::BitAnd { span, left, right },
-                Child7((left, _, right)) => ROpExpr::BitOr { span, left, right },
-                Child8((left, _, right)) => ROpExpr::BitXOr { span, left, right },
-                Child9(AnyOf2::Child1((left, _, right))) => ROpExpr::LShift { span, left, right },
-                Child9(AnyOf2::Child2((left, _, right))) => ROpExpr::RShift { span, left, right },
+                Child1((left, _, _, _, right)) => ROpExpr::Add { span, left, right },
+                Child2((left, _, _, _, right)) => ROpExpr::Sub { span, left, right },
+                Child3((left, _, _, _, right)) => ROpExpr::Mul { span, left, right },
+                Child4((left, _, _, _, right)) => ROpExpr::Div { span, left, right },
+                Child5((left, _, _, _, right)) => ROpExpr::Mod { span, left, right },
+                Child6((left, _, _, _, right)) => ROpExpr::BitAnd { span, left, right },
+                Child7((left, _, _, _, right)) => ROpExpr::BitOr { span, left, right },
+                Child8((left, _, _, _, right)) => ROpExpr::BitXOr { span, left, right },
+                Child9(AnyOf2::Child1((left, _, _, _, right))) => ROpExpr::LShift { span, left, right },
+                Child9(AnyOf2::Child2((left, _, _, _, right))) => ROpExpr::RShift { span, left, right },
             }
         }
     ));
 
     comparison_expression_rule.set(MapV(
         Spanned(OneOf6(
-            (expression, "==", expression),
-            (expression, "!=", expression),
-            (expression, '>' , expression),
-            (expression, '<' , expression),
-            (expression, ">=", expression),
-            (expression, "<=", expression),
+            (expression, w, "==", w, expression),
+            (expression, w, "!=", w, expression),
+            (expression, w, '>' , w, expression),
+            (expression, w, '<' , w, expression),
+            (expression, w, ">=", w, expression),
+            (expression, w, "<=", w, expression),
         )),
         |(span, six)| {
             use AnyOf6::*;
             match six {
-                Child1((left, _, right)) => ROpExpr::Eq { span, left, right },
-                Child2((left, _, right)) => ROpExpr::NotEq { span, left, right },
-                Child3((left, _, right)) => ROpExpr::LessThan { span, left, right },
-                Child4((left, _, right)) => ROpExpr::GreaterThan { span, left, right },
-                Child5((left, _, right)) => ROpExpr::LessThanOrEq { span, left, right },
-                Child6((left, _, right)) => ROpExpr::GreaterThanOrEq { span, left, right },
+                Child1((left, _, _, _, right)) => ROpExpr::Eq { span, left, right },
+                Child2((left, _, _, _, right)) => ROpExpr::NotEq { span, left, right },
+                Child3((left, _, _, _, right)) => ROpExpr::LessThan { span, left, right },
+                Child4((left, _, _, _, right)) => ROpExpr::GreaterThan { span, left, right },
+                Child5((left, _, _, _, right)) => ROpExpr::LessThanOrEq { span, left, right },
+                Child6((left, _, _, _, right)) => ROpExpr::GreaterThanOrEq { span, left, right },
             }
         }
     ));
 
     lazy_boolean_expression_rule.set(MapV(
         Spanned(OneOf2(
-            (expression, "||", expression),
-            (expression, "&&", expression),
+            (expression, w, "||", w, expression),
+            (expression, w, "&&", w, expression),
         )),
         |(span, two)| {
             use AnyOf2::*;
             match two {
-                Child1((left, _, right)) => ROpExpr::LogicOr  { span, left, right },
-                Child2((left, _, right)) => ROpExpr::LogicAnd { span, left, right },
+                Child1((left, _, _, _, right)) => ROpExpr::LogicOr  { span, left, right },
+                Child2((left, _, _, _, right)) => ROpExpr::LogicAnd { span, left, right },
             }
         }
     ));
 
     type_cast_expression_rule.set(MapV(
-        Spanned((expression, "as", type_no_bounds)),
-        |(span, (left, _, ty))| { ROpExpr::TypeCast { span, left, ty } }
+        Spanned((expression, w, "as", w, type_no_bounds)),
+        |(span, (left, _, _, _, ty))| { ROpExpr::TypeCast { span, left, ty } }
     ));
 
     assignment_expression_rule.set(MapV(
-        Spanned((expression, '=', expression)),
-        |(span, (left, _, right))| { ROpExpr::Assign { span, left, right } }
+        Spanned((expression, w, '=', w, expression)),
+        |(span, (left, _, _, _, right))| { ROpExpr::Assign { span, left, right } }
     ));
 
     compound_assignment_expression_rule.set(MapV(
         Spanned(OneOf9(
-            (expression, "+=", expression),
-            (expression, "-=", expression),
-            (expression, "*=", expression),
-            (expression, "/=", expression),
-            (expression, "%=", expression),
-            (expression, "&=", expression),
-            (expression, "|=", expression),
-            (expression, "^=", expression),
+            (expression, w, "+=", w, expression),
+            (expression, w, "-=", w, expression),
+            (expression, w, "*=", w, expression),
+            (expression, w, "/=", w, expression),
+            (expression, w, "%=", w, expression),
+            (expression, w, "&=", w, expression),
+            (expression, w, "|=", w, expression),
+            (expression, w, "^=", w, expression),
             OneOf2(
-                (expression, "<<=", expression),
-                (expression, ">>=", expression),
+                (expression, w, "<<=", w, expression),
+                (expression, w, ">>=", w, expression),
             ),
         )),
         |(span, nine)| {
             use AnyOf9::*;
             match nine {
-                Child1((left, _, right)) => ROpExpr::AddAssign { span, left, right },
-                Child2((left, _, right)) => ROpExpr::SubAssign { span, left, right },
-                Child3((left, _, right)) => ROpExpr::MulAssign { span, left, right },
-                Child4((left, _, right)) => ROpExpr::DivAssign { span, left, right },
-                Child5((left, _, right)) => ROpExpr::ModAssign { span, left, right },
-                Child6((left, _, right)) => ROpExpr::BitAndAssign { span, left, right },
-                Child7((left, _, right)) => ROpExpr::BitOrAssign { span, left, right },
-                Child8((left, _, right)) => ROpExpr::BitXOrAssign { span, left, right },
-                Child9(AnyOf2::Child1((left, _, right))) => ROpExpr::LShiftAssign { span, left, right },
-                Child9(AnyOf2::Child2((left, _, right))) => ROpExpr::RShiftAssign { span, left, right },
+                Child1((left, _, _, _, right)) => ROpExpr::AddAssign { span, left, right },
+                Child2((left, _, _, _, right)) => ROpExpr::SubAssign { span, left, right },
+                Child3((left, _, _, _, right)) => ROpExpr::MulAssign { span, left, right },
+                Child4((left, _, _, _, right)) => ROpExpr::DivAssign { span, left, right },
+                Child5((left, _, _, _, right)) => ROpExpr::ModAssign { span, left, right },
+                Child6((left, _, _, _, right)) => ROpExpr::BitAndAssign { span, left, right },
+                Child7((left, _, _, _, right)) => ROpExpr::BitOrAssign { span, left, right },
+                Child8((left, _, _, _, right)) => ROpExpr::BitXOrAssign { span, left, right },
+                Child9(AnyOf2::Child1((left, _, _, _, right))) => ROpExpr::LShiftAssign { span, left, right },
+                Child9(AnyOf2::Child2((left, _, _, _, right))) => ROpExpr::RShiftAssign { span, left, right },
             }
         }
     ));
@@ -4964,15 +4986,15 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // - GROUPED EXPRESSIONS -
 
     grouped_expression_rule.set(MapV(
-        Spanned(('(', expression, ')')),
-        |(span, (_, expr, _))| { RGroupExpr { span, expr } }
+        Spanned(('(', w, expression, w, ')')),
+        |(span, (_, _, expr, _, _))| { RGroupExpr { span, expr } }
     ));
 
     // - ARRAY EXPRESSIONS -
 
     array_expression_rule.set(MapV(
-        Spanned(('[', Spanned(Maybe(array_elements)), ']')),
-        |(span, (_, (espan, elements), _))| {
+        Spanned(('[', w, Spanned(Maybe(array_elements)), w, ']')),
+        |(span, (_, _, (espan, elements), _, _))| {
             RArrayExpr {
                 span,
                 elements: elements.unwrap_or_else(
@@ -4983,34 +5005,28 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     array_elements_rule.set(MapV(
-        Spanned(OneOf3(
-            expression,
-            (expression, ZeroOrMore((',', expression)), Maybe(',')),
-            (expression, ';', expression)
+        Spanned(OneOf2(
+            (expression, w, ';', w, expression),
+            (expression, ZeroOrMore((w, ',', w, expression)), Maybe((w, ','))),
         )),
         |(span, three)| {
-            use AnyOf3::*;
+            use AnyOf2::*;
             match three {
-                Child1(expr) => {
-                    let mut exprs: Vec<RExpr> = Vec::new();
-                    exprs.push(expr);
-                    RArrayElements::List { span, elements: exprs }
+                Child1((duplicate, _, _, _, num_times)) => {
+                    RArrayElements::Duplicate { span, duplicate, num_times }
                 },
                 Child2((expr, exprs, _)) => {
-                    let mut exprs: Vec<RExpr> = exprs.into_iter().map(|(_, e)|e).collect();
+                    let mut exprs: Vec<RExpr> = exprs.into_iter().map(|(_, _, _, e)|e).collect();
                     exprs.insert(0, expr);
                     RArrayElements::List { span, elements: exprs }
                 },
-                Child3((duplicate, _, num_times)) => {
-                    RArrayElements::Duplicate { span, duplicate, num_times }
-                }
             }
         }
     ));
 
     index_expression_rule.set(MapV(
-        Spanned((expression, '[', expression, ']')),
-        |(span, (to_index, _, index_with, _))| {
+        Spanned((expression, '[', w, expression, w, ']')),
+        |(span, (to_index, _, _, index_with, _, _))| {
             RIndexExpr { span, to_index, index_with }
         }
     ));
@@ -5018,8 +5034,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // - TUPLE_EXPRESSION -
 
     tuple_expression_rule.set(MapV(
-        Spanned(('(', Maybe(tuple_elements), ')')),
-        |(span, (_, elems, _))| {
+        Spanned(('(', w, Maybe(tuple_elements), w, ')')),
+        |(span, (_, _, elems, _, _))| {
             RTupleExpr { 
                 span,
                 elems: elems.unwrap_or_else(||Vec::new())
@@ -5028,9 +5044,9 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     tuple_elements_rule.set(MapV(
-        (OneOrMore((expression, ',')), Maybe(expression)),
+        (ZeroOrMore((expression, w, ',', w)), Maybe(expression)),
         |(exprs, expr)| {
-            let mut exprs: Vec<RExpr> = exprs.into_iter().map(|(e, _)|e).collect();
+            let mut exprs: Vec<RExpr> = exprs.into_iter().map(|(e, _, _, _)|e).collect();
             if let Some(expr) = expr {
                 exprs.push(expr);
             }
@@ -5059,28 +5075,28 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     struct_expr_struct_rule.set(
-        (path_in_expression, '{', Maybe((struct_expr_fields, struct_base)), '}')
+        (path_in_expression, '{', w, Maybe((struct_expr_fields, struct_base)), w, '}')
     );
 
     struct_expr_fields_rule.set(
-        (struct_expr_field, ZeroOrMore((',', struct_expr_field)), OneOf2((',', struct_base), Maybe(',')))
+        (struct_expr_field, ZeroOrMore((w, ',', w, struct_expr_field)), OneOf2((w, ',', w, struct_base), Maybe((w, ','))))
     );
 
     struct_expr_field_rule.set((
         ZeroOrMore(outer_attribute),
         OneOf2(
             identifier,
-            (OneOf2(identifier, tuple_index), ':', expression)
+            (OneOf2(identifier, tuple_index), w, ':', w, expression)
         )
     ));
 
     struct_base_rule.set((
-        "..", expression
+        "..", w, expression
     ));
 
     struct_expr_tuple_rule.set((
-        path_in_expression, '(',
-        Maybe((expression, ZeroOrMore((',', expression)), Maybe(',')))
+        path_in_expression, '(', w,
+        Maybe((expression, ZeroOrMore((w, ',', w, expression)), Maybe((w, ','))))
     ));
 
     struct_expr_unit_rule.set(path_in_expression);
@@ -5088,20 +5104,20 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // - CALL EXPRESSIONS -
 
     call_expression_rule.set(MapV(
-        Spanned((expression, '(', Maybe(call_params), ')')),
+        Spanned((expression, '(', w, Maybe(call_params), w, ')')),
         |(span, _)| {
             RCallExpr { span }
         }
     ));
 
     call_params_rule.set(
-        (expression, ZeroOrMore((',', expression)), Maybe(','))
+        (expression, w, ZeroOrMore((w, ',', w, expression)), Maybe((w, ',')))
     );
 
     // - METHOD CALL EXPRESSIONS -
 
     method_call_expression_rule.set(MapV(
-        Spanned((expression, '.', path_expr_segment, '(', Maybe(call_params), ')')),
+        Spanned((expression, '.', path_expr_segment, '(', w, Maybe(call_params), w, ')')),
         |(span, _)| {
             RCallExpr { span }
         }       
@@ -5121,12 +5137,12 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     closure_expression_rule.set(MapV(Spanned((
             Maybe("move"),
             OneOf2(
-                "||",
-                ('|', Maybe(closure_parameters), '|')
+                ('|', w, '|'),
+                ('|', w, Maybe(closure_parameters), w, '|')
             ),
             OneOf2(
                 expression,
-                ("->", type_no_bounds, block_expression)
+                ("->", w, type_no_bounds, w, block_expression)
             )
         )),
         |(span, _)| {
@@ -5137,11 +5153,11 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     closure_parameters_rule.set(
-        (closure_param, ZeroOrMore((',', closure_param)), Maybe(','))
+        (closure_param, ZeroOrMore((w, ',', w, closure_param)), Maybe((w, ',')))
     );
 
     closure_param_rule.set(
-        (ZeroOrMore(outer_attribute), pattern_no_top_alt, Maybe((':', _type)))
+        (ZeroOrMore((outer_attribute, w)), pattern_no_top_alt, Maybe((w, ':', w, _type)))
     );
 
     // - LOOPS AND OTHER BREAKABLE EXPRESSIONS -
@@ -5173,37 +5189,39 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     infinite_loop_expression_rule.set(MapV(
-        Spanned(("loop", block_expression)),
-        |(span, (_, body))| { RLoop::Infinite { span, body } }
+        Spanned(("loop", w, block_expression)),
+        |(span, (_, _, body))| { RLoop::Infinite { span, body } }
     ));
 
     predicate_loop_expression_rule.set(MapV(
-        Spanned(("while", Not(struct_expression), expression, block_expression)),
-        |(span, (_, _, expr, body))| { RLoop::While { span, expr, body } }
+        Spanned(("while", w, Not(struct_expression), expression, w, block_expression)),
+        |(span, (_, _, _, expr, w, body))| { RLoop::While { span, expr, body } }
     ));
 
     predicate_pattern_loop_expression_rule.set(MapV(
-        Spanned(("while", "let", pattern, '=', Not(lazy_boolean_expression), scrutinee, block_expression)),
-        |(span, (_, _, pattern, _, _, expr, body))| {
+        Spanned(("while", w, "let", w, pattern, w, '=', w, Not(lazy_boolean_expression), scrutinee, w, block_expression)),
+        |(span, (_, _, _, _, pattern, _, _, _, _, expr, _, body))| {
             RLoop::WhileLet { span, pattern, expr, body }
         }
     ));
 
     iterator_loop_expression_rule.set(MapV(
-        Spanned(("for", pattern, "in", Not(struct_expression), expression, block_expression)),
-        |(span, (_, pattern, _, _, expr, body))| {
+        Spanned(("for", w, pattern, w, "in", w, Not(struct_expression), expression, w, block_expression)),
+        |(span, (_, _, pattern, _, _, _, _, expr, _, body))| {
             RLoop::For { span, pattern, expr, body }
         }
     ));
 
     loop_label_rule.set(MapV(
-        (lifetime_or_label, ':'),
-        |(l, _)| l
+        (lifetime_or_label, w, ':'),
+        |(l, _, _)| l
     ));
 
     break_expression_rule.set(MapV(
-        Spanned(("break", Maybe(lifetime_or_label), Maybe(expression))),
-        |(span, (_, lifetime, expr))| { RBreakExpr { span, lifetime, expr } }
+        Spanned(("break", Maybe((w, lifetime_or_label)), Maybe((w, expression)))),
+        |(span, (_, lifetime, expr))| {
+            RBreakExpr { span, lifetime: lifetime.map(|(_, l)|l), expr: expr.map(|(_, e)|e) }
+        }
     ));
 
     label_block_expression_rule.set(MapV(
@@ -5214,9 +5232,9 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     continue_expression_rule.set(MapV(
-        Spanned(("continue", Maybe(lifetime_or_label))),
+        Spanned(("continue", Maybe((w, lifetime_or_label)))),
         |(span, (_, label))| {
-            RContinueExpr { span, label }
+            RContinueExpr { span, label: label.map(|(_, l)|l) }
         }
     ));
 
@@ -5245,18 +5263,18 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     range_expr_rule.set(MapV(
-        Spanned((expression, "..", expression)),
-        |(span, (left, _, right))| { RRangeExpr::Range { span, left, right } }
+        Spanned((expression, w, "..", w, expression)),
+        |(span, (left, _, _, _, right))| { RRangeExpr::Range { span, left, right } }
     ));
 
     range_from_expr_rule.set(MapV(
-        Spanned((expression, "..")),
-        |(span, (left, _))| { RRangeExpr::RangeFrom { span, left } }
+        Spanned((expression, w, "..")),
+        |(span, (left, _, _))| { RRangeExpr::RangeFrom { span, left } }
     ));
 
     range_to_expr_rule.set(MapV(
-        Spanned(("..", expression)),
-        |(span, (_, right))| { RRangeExpr::RangeTo { span, right } }
+        Spanned(("..", w, expression)),
+        |(span, (_, _, right))| { RRangeExpr::RangeTo { span, right } }
     ));
 
     range_full_expr_rule.set(MapV(
@@ -5265,24 +5283,24 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     range_inclusive_expr_rule.set(MapV(
-        Spanned((expression, "..=", expression)),
-        |(span, (left, _, right))| { RRangeExpr::RangeInclusive { span, left, right } }
+        Spanned((expression, w, "..=", w, expression)),
+        |(span, (left, _, _, _, right))| { RRangeExpr::RangeInclusive { span, left, right } }
     ));
 
     range_to_inclusive_expr_rule.set(MapV(
-        Spanned(("..=", expression)),
-        |(span, (_, right))| { RRangeExpr::RangeToInclusive { span, right } }
+        Spanned(("..=", w, expression)),
+        |(span, (_, _, right))| { RRangeExpr::RangeToInclusive { span, right } }
     ));
 
     // - if AND if let EXPRESSIONS -
 
     if_expression_rule.set(MapV(Spanned((
-            "if", Not(struct_expression), expression, block_expression,
-            Maybe(("else", OneOf3(block_expression, if_expression, if_let_expression)))
+            "if", w, Not(struct_expression), expression, w, block_expression,
+            Maybe((w, "else", w, OneOf3(block_expression, if_expression, if_let_expression)))
         )),
-        |(span, (_, _, expr, body, maybe_else))| {
+        |(span, (_, _, _, expr, _, body, maybe_else))| {
             match maybe_else {
-                Some((_, three)) => {
+                Some((_, _, _, three)) => {
                     use AnyOf3::*;
                     RIfExpr::IfElse {
                         span,
@@ -5307,12 +5325,12 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     if_let_expression_rule.set(MapV(Spanned((
-            "if", "let", pattern, '=', Not(lazy_boolean_expression), scrutinee, block_expression,
-            Maybe(("else", OneOf3(block_expression, if_expression, if_let_expression)))
+            "if", w, "let", w, pattern, w, '=', w, Not(lazy_boolean_expression), scrutinee, w, block_expression,
+            Maybe((w, "else", w, OneOf3(block_expression, if_expression, if_let_expression)))
         )),
-        |(span, (_, _, pattern, _, _, scrutinee, body, maybe_else))| {
+        |(span, (_, _, _, _, pattern, _, _, _, _, scrutinee, _, body, maybe_else))| {
             match maybe_else {
-                Some((_, three)) => {
+                Some((_, _, _, three)) => {
                     use AnyOf3::*;
                     RIfExpr::IfLetElse {
                         span,
@@ -5341,9 +5359,9 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // - MATCH EXPRESSIONS -
 
     match_expression_rule.set(MapV(SpanOf((
-            "match", scrutinee, '{',
-            ZeroOrMore(inner_attribute),
-            Maybe(match_arms),
+            "match", w, scrutinee, w, '{', w,
+            ZeroOrMore(inner_attribute), w,
+            Maybe(match_arms), w,
             '}'
         )),
         |span| {
@@ -5358,26 +5376,29 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     match_arms_rule.set(
         OneOf2(
-            ZeroOrMore((match_arm, "=>", OneOf2((expression_without_block, ','), (expression_with_block, Maybe(','))))),
-            (match_arm, "=>", expression, Maybe(','))
+            ZeroOrMore((match_arm, w, "=>", w, OneOf2((expression_without_block, w, ','), (expression_with_block, Maybe((w, ',')))))),
+            (match_arm, w, "=>", w, expression, Maybe((w, ',')))
         )
     );
 
     match_arm_rule.set((
+        w,
         ZeroOrMore(outer_attribute),
+        w,
         pattern,
+        w,
         Maybe(match_arm_gaurd)
     ));
 
     match_arm_gaurd_rule.set(
-        ("if", expression)
+        ("if", w, expression)
     );
 
     // - RETURN EXPRESSIONS -
 
     return_expression_rule.set(MapV(
-        Spanned(("return", Maybe(expression))),
-        |(span, (_, expr))| { RReturnExpr { span, expr } }
+        Spanned(("return", w, Maybe(expression))),
+        |(span, (_, _, expr))| { RReturnExpr { span, expr } }
     ));
 
     // - AWAIT EXPRESSIONS -
@@ -5397,12 +5418,12 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // --- PATTERNS ---
 
     pattern_rule.set(MapV(
-        Spanned((Maybe('|'), pattern_no_top_alt, ZeroOrMore(('|', pattern_no_top_alt)))),
+        Spanned((Maybe(('|', w)), pattern_no_top_alt, ZeroOrMore((w, '|', w, pattern_no_top_alt)))),
         |(span, (_, pattern, patterns))| {
             RPattern {
                 span,
                 patterns: {
-                    let mut patterns: Vec<RSubPattern> = patterns.into_iter().map(|(_, p)|p).collect();
+                    let mut patterns: Vec<RSubPattern> = patterns.into_iter().map(|(_, _, _, p)|p).collect();
                     patterns.insert(0, pattern);
                     patterns
                 }
@@ -5468,8 +5489,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
             raw_string_literal,
             byte_string_literal,
             raw_byte_string_literal,
-            Spanned((Maybe('-'), integer_literal)),
-            Spanned((Maybe('-'), float_literal)),
+            Spanned((Maybe('-'), w, integer_literal)),
+            Spanned((Maybe('-'), w, float_literal)),
         ),
         |eight| {
             use AnyOf8::*;
@@ -5480,21 +5501,21 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                 Child4(v) => RSLit::RawString(v),
                 Child5(v) => RSLit::ByteString(v),
                 Child6(v) => RSLit::RawByteString(v),
-                Child7((span, (n, int))) => RSLit::Integer(RSIntLit { span, neg: n.is_some(), lit: int }),
-                Child8((span, (n, flt))) => RSLit::Float(RSFloatLit { span, neg: n.is_some(), lit: flt }),
+                Child7((span, (n, _, int))) => RSLit::Integer(RSIntLit { span, neg: n.is_some(), lit: int }),
+                Child8((span, (n, _, flt))) => RSLit::Float(RSFloatLit { span, neg: n.is_some(), lit: flt }),
             }
         }
     ));
 
     identifier_pattern_rule.set(MapV(
-        Spanned((Maybe("ref"), Maybe("mut"), identifier, Maybe(('@', pattern_no_top_alt)))),
+        Spanned((Maybe(("ref", w)), Maybe(("mut", w)), identifier, Maybe((w, '@', w, pattern_no_top_alt)))),
         |(span, (reference, mutable, ident, test))| {
             RIdentPattern {
                 span,
-                reference,
-                mutable,
+                reference: reference.map(|(r, _)|r),
+                mutable: mutable.map(|(m, _)|m),
                 ident,
-                test: test.map(|(_, test)|test)
+                test: test.map(|(_, _, _, test)|test)
             }
         }
     ));
@@ -5520,26 +5541,26 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     range_inclusive_pattern_rule.set(MapV(
-        Spanned((range_pattern_bound, "..=", range_pattern_bound)),
-        |(span, (left, _, right))| {
+        Spanned((range_pattern_bound, w, "..=", w, range_pattern_bound)),
+        |(span, (left, _, _, _, right))| {
             RRangePattern::RangeInclusive { span, left, right }
         }
     ));
 
     range_from_pattern_rule.set(MapV(
-        Spanned((range_pattern_bound, "..")),
-        |(span, (left, _))| {
+        Spanned((range_pattern_bound, w, "..")),
+        |(span, (left, _, _))| {
             RRangePattern::RangeFrom { span, left }
         }
     ));
 
     range_to_inclusive_pattern_rule.set(MapV(
-        Spanned(("..=", range_pattern_bound)),
-        |(span, (_, right))| { RRangePattern::RangeToInclusive { span, right } }
+        Spanned(("..=", w, range_pattern_bound)),
+        |(span, (_, _, right))| { RRangePattern::RangeToInclusive { span, right } }
     ));
 
     obsolete_range_pattern_rule.set(Map(
-        Spanned((range_pattern_bound, "...", range_pattern_bound)),
+        Spanned((range_pattern_bound, w, "...", w, range_pattern_bound)),
         |res| {
             use ParseResult::*;
             match res {
@@ -5556,8 +5577,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         Spanned(OneOf5(
             char_literal,
             byte_literal,
-            (Maybe('-'), integer_literal),
-            (Maybe('-'), float_literal),
+            (Maybe(('-', w)), integer_literal),
+            (Maybe(('-', w)), float_literal),
             path_expression
         )),
         |(span, five)| {
@@ -5587,8 +5608,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     reference_pattern_rule.set(MapV(
-        Spanned((OneOf2('&', ('&', '&')), Maybe("mut"), pattern_without_range)),
-        |(span, (refs, mutable, pattern))| {
+        Spanned((OneOf2('&', ('&', '&')), Maybe((w, "mut")), w, pattern_without_range)),
+        |(span, (refs, mutable, w, pattern))| {
             let (ref1, ref2) = match refs {
                 AnyOf2::Child1(ref1) => (Some(ref1), None),
                 AnyOf2::Child2((ref1, ref2)) => (Some(ref1), Some(ref2)),
@@ -5597,23 +5618,23 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                 span,
                 ref1,
                 ref2,
-                mutable,
+                mutable: mutable.map(|(_, m)|m),
                 pattern,
             }
         }
     ));
 
     struct_pattern_rule.set(MapV(Spanned((
-            path_in_expression, '{',
+            path_in_expression, w, '{', w,
             Maybe(struct_pattern_elements)
         )),
-        |(span, (path, _, elems))| {
+        |(span, (path, _, _, _, elems))| {
             RStructPattern { span, path, elems }
         }
     ));
 
     struct_pattern_elements_rule.set(MapV(
-        Spanned((struct_pattern_fields, Maybe((Maybe(','), struct_pattern_et_cetera)), Maybe(','))),
+        Spanned((struct_pattern_fields, Maybe((Maybe((w, ',')), struct_pattern_et_cetera)), Maybe((w, ',')))),
         |(span, (fields, et_cetera, _))| {
             RStructPatternElems {
                 span,
@@ -5624,10 +5645,10 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     struct_pattern_fields_rule.set(MapV(Spanned(
-            (struct_pattern_field, ZeroOrMore((',', struct_pattern_field))),
+            (struct_pattern_field, ZeroOrMore((w, ',', w, struct_pattern_field))),
         ),
         |(span, (field, fields))| {
-            let mut fields: Vec<RStructPatternField> = fields.into_iter().map(|(_, f)|f).collect();
+            let mut fields: Vec<RStructPatternField> = fields.into_iter().map(|(_, _, _, f)|f).collect();
             fields.insert(0, field);
             fields
         }
@@ -5636,31 +5657,31 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     struct_pattern_field_rule.set(MapV(Spanned((
             ZeroOrMore(outer_attribute),
             OneOf3(
-                (tuple_index, ':', pattern),
-                (identifier, ':', pattern),
-                (Maybe("ref"), Maybe("mut"), identifier)
+                (tuple_index, w, ':', w, pattern),
+                (identifier, w, ':', w, pattern),
+                (Maybe(("ref", w)), Maybe(("mut", w)), identifier)
             )
         )),
         |(span, (_, three))| {
             use AnyOf3::*;
             match three {
-                Child1((tuple_index, _, pattern)) => RStructPatternField::TupleMatch { span, tuple_index, pattern },
-                Child2((ident, _, pattern)) => RStructPatternField::IdentMatch { span, ident, pattern },
+                Child1((tuple_index, _, _, _, pattern)) => RStructPatternField::TupleMatch { span, tuple_index, pattern },
+                Child2((ident, _, _, _, pattern)) => RStructPatternField::IdentMatch { span, ident, pattern },
                 Child3((r, m, ident)) => RStructPatternField::Ident { span, reference: r.is_some(), mutable: m.is_some(), ident },
             }
         }
     ));
 
     struct_pattern_et_cetera_rule.set(MapV((
-            ZeroOrMore(outer_attribute),
+            ZeroOrMore((outer_attribute, w)),
             ".."
         ),
         |(_, a)| { a }
     ));
 
     tuple_struct_pattern_rule.set(MapV(
-        Spanned((path_in_expression, '(', Maybe(tuple_struct_items), ')')),
-        |(span, (path, _, items, _))| {
+        Spanned((path_in_expression, '(', w, Maybe(tuple_struct_items), w, ')')),
+        |(span, (path, _, _, items, _, _))| {
             RTupleStructPattern {
                 span,
                 path,
@@ -5670,41 +5691,41 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     tuple_struct_items_rule.set(MapV(
-        (pattern, ZeroOrMore((',', pattern)), Maybe(',')),
+        (pattern, ZeroOrMore((w, ',', w, pattern)), Maybe((w, ','))),
         |(pattern, patterns, _)| {
-            let mut patterns: Vec<RPattern> = patterns.into_iter().map(|(_, p)|p).collect();
+            let mut patterns: Vec<RPattern> = patterns.into_iter().map(|(_, _, _, p)|p).collect();
             patterns.insert(0, pattern);
             patterns
         }
     ));
 
     tuple_pattern_rule.set(MapV(
-        Spanned(('(', Maybe(tuple_pattern_items), ')')),
-        |(span, (_, items, _))| {
+        Spanned(('(', w, Maybe(tuple_pattern_items), w, ')')),
+        |(span, (_, _, items, _, _))| {
             RTuplePattern { span, }           
         }
     ));
 
     tuple_pattern_items_rule.set(
         OneOf3(
-            (pattern, ','),
+            (pattern, w, ','),
             rest_pattern,
-            (pattern, OneOrMore((',', pattern)), Maybe(','))
+            (pattern, OneOrMore((w, ',', w, pattern)), Maybe((w, ',')))
         )
     );
 
     rest_pattern_rule.set("..");
 
     grouped_pattern_rule.set(MapV(
-        Spanned(('(', pattern, ')')),
-        |(span, (_, pattern, _))| {
+        Spanned(('(', w, pattern, w, ')')),
+        |(span, (_, _, pattern, _, _))| {
             RGroupedPattern { span, pattern }
         }
     ));
 
     slice_pattern_rule.set(MapV(
-        Spanned(('[', Maybe(slice_pattern_items), ']')),
-        |(span, (_, patterns, _))| {
+        Spanned(('[', w, Maybe(slice_pattern_items), w, ']')),
+        |(span, (_, _, patterns, _, _))| {
             RSlicePattern {
                 span,
                 contents: patterns.unwrap_or_else(||Vec::new())
@@ -5713,9 +5734,9 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     slice_pattern_items_rule.set(MapV(
-        (pattern, ZeroOrMore((',', pattern)), Maybe(',')),
+        (pattern, ZeroOrMore((w, ',', w, pattern)), Maybe((w, ','))),
         |(pattern, patterns, _)| {
-            let mut patterns: Vec<RPattern> = patterns.into_iter().map(|(_, p)|p).collect();
+            let mut patterns: Vec<RPattern> = patterns.into_iter().map(|(_, _, _, p)|p).collect();
             patterns.insert(0, pattern);
             patterns
         }
@@ -5729,12 +5750,12 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // --- TRAIT AND LIFETIME BOUNDS ---
 
     type_param_bounds_rule.set(MapV(
-        Spanned((type_param_bound, ZeroOrMore(('+', type_param_bound)), Maybe('+'))),
+        Spanned((type_param_bound, ZeroOrMore((w, '+', w, type_param_bound)), Maybe((w, '+')))),
         |(span, (param_bound, param_bounds, _))| {
             RTypeParamBounds {
                 span,
                 bounds: {
-                    let mut bounds: Vec<RTypeParamBound> = param_bounds.into_iter().map(|(_, bound)|bound).collect();
+                    let mut bounds: Vec<RTypeParamBound> = param_bounds.into_iter().map(|(_, _, _, bound)|bound).collect();
                     bounds.insert(0, param_bound);
                     bounds
                 }
@@ -5758,13 +5779,13 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     trait_bound_rule.set(MapV(
         Spanned(OneOf2(
-            (Maybe('?'), Maybe(for_lifetimes), type_path),
-            ('(', Maybe('?'), Maybe(for_lifetimes), type_path, ')'),
+            (Maybe(('?', w)), Maybe((for_lifetimes, w)), type_path),
+            ('(', w, Maybe(('?', w)), Maybe((for_lifetimes, w)), type_path, w, ')'),
         )),
         |(span, two)| {
             use AnyOf2::*;
             match two {
-                Child1((n, lifetimes, ty)) | Child2((_, n, lifetimes, ty, _)) => {
+                Child1((n, lifetimes, ty)) | Child2((_, _, n, lifetimes, ty, _, _)) => {
                     RTraitBound {
                         span,
                         not: n.is_some(),
@@ -5775,9 +5796,9 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     lifetime_bounds_rule.set(MapV(
-        (ZeroOrMore((lifetime, '+')), Maybe(lifetime)),
+        (ZeroOrMore((lifetime, w, '+', w)), Maybe(lifetime)),
         |(lifetimes, final_lifetime)| {
-            let mut lifetimes: Vec<RLifetime> = lifetimes.into_iter().map(|(l, _)|l).collect();
+            let mut lifetimes: Vec<RLifetime> = lifetimes.into_iter().map(|(l, _, _, _)|l).collect();
             if let Some(final_lifetime) = final_lifetime {
                 lifetimes.push(final_lifetime);
             }
@@ -5802,8 +5823,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     for_lifetimes_rule.set(MapV(
-        Spanned(("for", generic_params)),
-        |(span, (_, generics))| {
+        Spanned(("for", w, generic_params)),
+        |(span, (_, _, generics))| {
             RForLifetimes { span, generics }
         }
     ));
@@ -5813,10 +5834,10 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     visibility_rule.set(MapV(
         Spanned(OneOf5(
             "pub",
-            ("pub", '(', "crate", ')'),
-            ("pub", '(', "self", ')'),
-            ("pub", '(', "super", ')'),
-            ("pub", '(', "in", simple_path, ')')
+            ("pub", w, '(', w, "crate", w, ')'),
+            ("pub", w, '(', w, "self", w, ')'),
+            ("pub", w, '(', w, "super", w, ')'),
+            ("pub", w, '(', w, "in", w, simple_path, w, ')')
         )),
         |(span, five)| {
             use AnyOf5::*;
@@ -5825,7 +5846,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                 Child2(_) => RVis::VisCrate { span },
                 Child3(_) => RVis::VisSelf { span },
                 Child4(_) => RVis::VisSuper { span },
-                Child5((_, _, _, path, _)) => RVis::VisPath { span, path },
+                Child5((_, _, _, _, _, _, path, _, _)) => RVis::VisPath { span, path },
             }
         }
     ));
