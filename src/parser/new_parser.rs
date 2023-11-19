@@ -1877,6 +1877,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     let identifier = SpanOf(OneOf2(non_keyword_identifier, raw_identifier));
     let identifier = &identifier;
 
+    let comment_rule = SRule();
     let generic_arg_rule = SRule();
     let generic_args_const_rule = SRule();
     let generic_args_binding_rule = SRule();
@@ -2152,6 +2153,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // the rules are all turned to into references here because that is the only
     // way to make it work. I could fix this, but it works and I'm running out
     // of time so this is how it is.
+    let comment = comment_rule.din();
     let generic_arg = generic_arg_rule.din();
     let generic_args_const = generic_args_const_rule.din();
     let generic_args_binding = generic_args_binding_rule.din();
@@ -2206,7 +2208,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     let token_tree = token_tree_rule.din();
     let macro_invocation_semi = macro_invocation_semi_rule.din();
     let block_comment_or_doc = block_comment_or_doc_rule.din();
-    let line_comment: &dyn ParseNode<RComment, String, &str, PPos, char> = line_comment_rule.din();
+    let line_comment = line_comment_rule.din();
     let block_comment = block_comment_rule.din();
     let inner_line_doc = inner_line_doc_rule.din();
     let inner_block_doc = inner_block_doc_rule.din();
@@ -2427,8 +2429,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     // whitespace
 
-    // a single white-space character
-    let wc = SpanOf(OneOf2(0..=32u32, 127u32));
+    // a single white-space character or comment
+    let wc = SpanOf(OneOf3(0..=32u32, 127u32, comment));
     // zero or more whitespace
     let w = SpanOf(ZeroOrMore(wc.clone()));
     // one or more whitespace
@@ -2958,6 +2960,16 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     // --- COMMENTS ---
+
+    comment_rule.set(SpanOf(OneOf7(
+        line_comment,
+        block_comment,
+        inner_line_doc,
+        inner_block_doc,
+        outer_line_doc,
+        outer_block_doc,
+        block_comment_or_doc,
+    )));
 
     line_comment_rule.set(MapV(
         Spanned(OneOf2(
