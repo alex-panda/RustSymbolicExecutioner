@@ -5,15 +5,9 @@ fn main() {
     a(x, y);
 }
 
-fn a(mut x:i32, mut y:i32) {
+fn a(mut x:i32, mut y:i32) -> u8 {
     x = y + 4;
     y = 2*x; 
     //symex
-    
-    //expected: 
-    //path: 1
-    //pi: true;
-    //sigma: x = y + 4, y = 2*(y + 4)
-    //
-
+    return 0;
 }
