@@ -1,3 +1,12 @@
+mod funnel;
+pub use funnel::*;
+
+mod trace;
+pub use trace::*;
+
+mod join;
+pub use join::*;
+
 mod lrec;
 pub use lrec::*;
 

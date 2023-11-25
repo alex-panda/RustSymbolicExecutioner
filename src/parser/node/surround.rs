@@ -19,13 +19,13 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 /// as a missing ending curly brace.
 /// 
 #[allow(non_snake_case)]
-pub fn Surround<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, Child3: ParseNode<Ok3, Err, Store, Pos, V>, MiddleFail: Fn(&Store, Ok1, Err) -> Err, EndFail: Fn(&Store, Ok1, Ok2, Err) -> Err, Ok1, Ok2, Ok3, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>(child1: Child1, child2: Child2, child3: Child3, middle_fail: MiddleFail, end_fail: EndFail) -> SurroundNode<Child1, Child2, Child3, MiddleFail, EndFail, Ok1, Ok2, Ok3, Err, Store, Pos, V> {
+pub fn Surround<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, Child3: ParseNode<Ok3, Err, Store, Pos, V>, MiddleFail: Fn(&Store, Ok1, Err) -> Err, EndFail: Fn(&Store, Ok1, Ok2, Err) -> Err, Ok1, Ok2, Ok3, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>(child1: Child1, child2: Child2, child3: Child3, mfail: MiddleFail, efail: EndFail) -> SurroundNode<Child1, Child2, Child3, MiddleFail, EndFail, Ok1, Ok2, Ok3, Err, Store, Pos, V> {
     SurroundNode {
         child1,
         child2,
         child3,
-        middle_fail,
-        end_fail,
+        middle_fail: mfail,
+        end_fail: efail,
         _zst: ZSTNode::default(),
     }
 }

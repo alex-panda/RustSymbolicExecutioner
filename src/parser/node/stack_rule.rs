@@ -1,5 +1,36 @@
 use std::cell::RefCell;
-use crate::parser::{Span, ParsePos, ParseStore, ParseValue, ParseNode, ParseResult, ZSTNode, ExpectedChildError, RefCellReadError, EmptyRuleError};
+use crate::parser::{Span, ParsePos, ParseStore, ParseValue, ParseNode, ParseResult, ZSTNode, EmptyRuleError};
+
+/// 
+/// A macro to make it easier to declare a rule.
+/// 
+#[macro_export]
+macro_rules! srule {
+    ($id: ident, $id_rule: ident, $ok_ty: ty, $err_ty: ty, $store_ty: ty, $pos_ty: ty, $v_ty: ty) => {
+        let $id_rule = $crate::parser::SRule();
+        let $id: &dyn ParseNode<$ok_ty, $err_ty, $store_ty, $pos_ty, $v_ty> = $id_rule.din();
+    };
+    ($id: ident, $id_rule: ident, $ok_ty: ty, $err_ty: ty, $store_ty: ty, $pos_ty: ty) => {
+        let $id_rule = $crate::parser::SRule();
+        let $id: &dyn ParseNode<$ok_ty, $err_ty, $store_ty, $pos_ty, _> = $id_rule.din();
+    };
+    ($id: ident, $id_rule: ident, $ok_ty: ty, $err_ty: ty, $store_ty: ty) => {
+        let $id_rule = $crate::parser::SRule();
+        let $id: &dyn ParseNode<$ok_ty, $err_ty, $store_ty, _, _> = $id_rule.din();
+    };
+    ($id: ident, $id_rule: ident, $ok_ty: ty, $err_ty: ty) => {
+        let $id_rule = $crate::parser::SRule();
+        let $id: &dyn ParseNode<$ok_ty, $err_ty, _, _, _> = $id_rule.din();
+    };
+    ($id: ident, $id_rule: ident, $ok_ty: ty) => {
+        let $id_rule = $crate::parser::SRule();
+        let $id: &dyn ParseNode<$ok_ty, _, _, _, _> = $id_rule.din();
+    };
+    ($id: ident, $id_rule: ident) => {
+        let $id_rule = $crate::parser::SRule();
+        let $id = $id_rule.din();
+    };
+}
 
 /// 
 /// A stack rule i.e. a `Rule` that lives on the stack.

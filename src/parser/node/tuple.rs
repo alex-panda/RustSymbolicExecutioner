@@ -48,8 +48,8 @@ macro_rules! impl_tuple {
                 fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
                     let mut curr_pos = pos.clone();
 
-                    handle_result!(self.0.parse(store, pos.clone()), curr_pos);
-                    $(handle_result!(self.$num.parse(store, pos.clone()), curr_pos);)*
+                    handle_result!(self.0.parse_span(store, pos.clone()), curr_pos);
+                    $(handle_result!(self.$num.parse_span(store, pos.clone()), curr_pos);)*
 
                     OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
                 }
@@ -73,7 +73,7 @@ impl_tuple!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
 impl_tuple!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
 impl_tuple!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14);
 impl_tuple!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
-//impl_tuple!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+impl_tuple!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
 //impl_tuple!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17);
 //impl_tuple!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18);
 //impl_tuple!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19);

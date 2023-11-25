@@ -4356,13 +4356,6 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     // --- EXPRESSIONS ---
 
-    //srule!(expr, expr_rule);
-    //srule!(block_expr, block_expr_rule);
-    //srule!(mul_or_div, mul_or_div_rule);
-    //srule!(add_or_sub, add_or_sub_rule);
-    //srule!(negate, negate_rule);
-    //expr_rule.set();
-
     expression_rule.set(LRec(Funnel2(
         expression_without_block,
         expression_with_block,

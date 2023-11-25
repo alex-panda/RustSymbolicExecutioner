@@ -1,5 +1,5 @@
 use core::fmt::Debug;
-use std::{collections::{HashMap, BTreeMap}, cell::RefCell};
+use std::{collections::HashMap, cell::RefCell};
 
 use crate::parser::{ZSTNode, LRecError, NoAdvanceError};
 
@@ -20,6 +20,8 @@ use ParseResult::*;
 impl <Ok: Debug + Clone + 'static, Err: Debug + Clone + From<LRecError> + From<NoAdvanceError<Pos>> + 'static, Store: ParseStore<Pos, V>, Pos: ParsePos + 'static, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Ok, Err, Store, Pos, V> for LRecNode<Child, Ok, Err, Store, Pos, V> {
     fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Ok, Err, Pos> {
         let key = ((store as *const _) as usize, pos.key());
+
+        println!("LRec ran!");
 
         // check if answer already in mem table
         {

@@ -1,5 +1,6 @@
 use super::super::{ParseStore, ParsePos, ParseValue, ParseNode, ParseResult, AllChildrenFailedError, ZSTNode, Span};
 
+use std::fmt::Debug;
 use ParseResult::*;
 use zst::ZST;
 
@@ -51,6 +52,20 @@ impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos,
 
         Error(AllChildrenFailedError { pos, errors: out.map(|v| if let Some(v) = v { v } else { panic!("`OneOf` node expected either success or {} errors, but less errors than expected were given", N) }) }.into())
     }
+
+    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+        let mut out = core::array::from_fn(|_| None);
+        for (i, child) in self.children.iter().enumerate() {
+            match child.parse_span(store, pos.clone()) {
+                Okay(value) => return Okay(value),
+                OkayAdvance(value, advance) => return OkayAdvance(value, advance),
+                Error(error) => out[i] = Some(error),
+                Panic(error) => return Panic(error),
+            }
+        }
+
+        Error(AllChildrenFailedError { pos, errors: out.map(|v| if let Some(v) = v { v } else { panic!("`OneOf` node expected either success or {} errors, but less errors than expected were given", N) }) }.into())
+    }
 }
 
 macro_rules! impl_one_of {
@@ -74,12 +89,6 @@ macro_rules! impl_one_of {
                 $(pub [<child $num>]: [<Child $num>],)*
                 _ok1: ZST<Ok1>,
                 $([<_ok $num>]: ZST<[<Ok $num>]>,)*
-            }
-
-            #[derive(Default)]
-            pub struct [<OneOf $name NodeData>]<T1 $(,[<T $num>])*> {
-                pub t1: T1,
-                $(pub [<t $num>]: [<T $num>],)*
             }
 
             impl <Ok1 $(,[<Ok $num>])*, Err: From<AllChildrenFailedError<Pos, Err, $num_children>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child1: ParseNode<Ok1, Err, Store, Pos, V> $(,[<Child $num>]: ParseNode<[<Ok $num>], Err, Store, Pos, V>)*> ParseNode<[<AnyOf $name>]<Ok1 $(,[<Ok $num>])*>, Err, Store, Pos, V> for [<OneOf $name Node>]<Child1 $(,[<Child $num>])*, Ok1 $(,[<Ok $num>])*, Err, Store, Pos, V> {
@@ -124,7 +133,7 @@ macro_rules! impl_one_of {
                 }
             }
 
-            #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+            #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
             pub enum [<AnyOf $name>]<O1 $(,[<O $num>])*> {
                 Child1(O1),
                 $([<Child $num>]([<O $num>]),)*
