@@ -10,7 +10,7 @@ macro_rules! value {
                 match store.value_at(&mut curr_pos) {
                     Some(value) => {
                         if value == *self {
-                            OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
+                            Okay(Span::new(pos, curr_pos.clone()), curr_pos)
                         } else {
                             Error(UnexpectedValueError { pos, found: value, expected: *self }.into())
                         }

@@ -34,14 +34,11 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
 
         // parse the delimited node
         match self.child1.parse(store, curr_pos.clone()) {
-            Okay(ok) => {
-                out.push(ok);
-            },
-            OkayAdvance(ok, adv) => {
+            Okay(ok, adv) => {
                 curr_pos = adv;
                 out.push(ok);
             },
-            Error(_) => return Okay(out),
+            Error(_) => return Okay(out, pos),
             Panic(err) => return Panic(err),
         }
 
@@ -50,24 +47,20 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
         loop {
             // parse the delimiter node
             match self.child2.parse(store, curr_pos.clone()) {
-                Okay(_) => {},
-                OkayAdvance(_, adv) => {
+                Okay(_, adv) => {
                     curr_pos = adv;
                 },
-                Error(_) => return OkayAdvance(out, pos),
+                Error(_) => return Okay(out, pos),
                 Panic(err) => return Panic(err),
             }
 
             // parse the delimited node
             match self.child1.parse(store, curr_pos.clone()) {
-                Okay(ok) => {
-                    out.push(ok);
-                },
-                OkayAdvance(ok, adv) => {
+                Okay(ok, adv) => {
                     curr_pos = adv;
                     out.push(ok);
                 },
-                Error(_) => return OkayAdvance(out, pos.clone()),
+                Error(_) => return Okay(out, pos.clone()),
                 Panic(err) => return Panic(err),
             }
 
@@ -82,11 +75,10 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
 
         // parse the delimited node
         match self.child1.parse_span(store, curr_pos.clone()) {
-            Okay(_) => { },
-            OkayAdvance(_, adv) => {
+            Okay(_, adv) => {
                 curr_pos = adv;
             },
-            Error(_) => return Okay(Span::new(start_pos, pos)),
+            Error(_) => return Okay(Span::new(start_pos, pos.clone()), pos),
             Panic(err) => return Panic(err),
         }
 
@@ -95,21 +87,19 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
         loop {
             // parse the delimiter node
             match self.child2.parse_span(store, curr_pos.clone()) {
-                Okay(_) => {},
-                OkayAdvance(_, adv) => {
+                Okay(_, adv) => {
                     curr_pos = adv;
                 },
-                Error(_) => return OkayAdvance(Span::new(start_pos, pos.clone()), pos),
+                Error(_) => return Okay(Span::new(start_pos, pos.clone()), pos),
                 Panic(err) => return Panic(err),
             }
 
             // parse the delimited node
             match self.child1.parse_span(store, curr_pos.clone()) {
-                Okay(_) => { },
-                OkayAdvance(_, adv) => {
+                Okay(_, adv) => {
                     curr_pos = adv;
                 },
-                Error(_) => return OkayAdvance(Span::new(start_pos, pos.clone()), pos.clone()),
+                Error(_) => return Okay(Span::new(start_pos, pos.clone()), pos.clone()),
                 Panic(err) => return Panic(err),
             }
 

@@ -50,10 +50,3 @@ impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> Ord for 
         std::cmp::Ordering::Equal
     }
 }
-
-
-impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<(), Err, Store, Pos, V> for ZSTNode<Ok, Err, Store, Pos, V> {
-    fn parse(&self, _store: &Store, _pos: Pos) -> super::ParseResult<(), Err, Pos> {
-        super::ParseResult::Okay(())
-    }
-}

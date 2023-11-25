@@ -29,8 +29,7 @@ impl <Child: ParseNode<Ok, Err, Store, Pos, V>, F: Fn(&Store, Pos, Err) -> Err, 
     fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Ok, Err, Pos> {
         use ParseResult::*;
         match self.child.parse(store, pos.clone()) {
-            Okay(value) => Okay(value),
-            OkayAdvance(value, advance) => OkayAdvance(value, advance),
+            Okay(value, advance) => Okay(value, advance),
             Error(err) => Panic((self.func)(store, pos, err)),
             Panic(err) => Panic(err),
         }

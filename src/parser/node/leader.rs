@@ -31,8 +31,7 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
 
         // try to parse child 1
         let ok1 = match self.child1.parse(store, pos.clone()) {
-            Okay(v) => v,
-            OkayAdvance(v, advance) => {
+            Okay(v, advance) => {
                 pos = advance;
                 v
             },
@@ -42,8 +41,7 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
 
         // child1 parsed so we expect child2 to also parse
         let ok2 = match self.child2.parse(store, pos.clone()) {
-            Okay(v) => v,
-            OkayAdvance(v, advance) => {
+            Okay(v, advance) => {
                 pos = advance;
                 v
             },
@@ -51,6 +49,6 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
             Panic(error) => return Panic(error),
         };
 
-        OkayAdvance((ok1, ok2), pos)
+        Okay((ok1, ok2), pos)
     }
 }

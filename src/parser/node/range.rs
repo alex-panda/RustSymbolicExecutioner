@@ -15,7 +15,7 @@ macro_rules! impl_range {
                         if !self.contains(&actual_char) {
                             Error(ValueOutsideRangeError { pos, found: actual_char, range_start: self.start_bound().cloned(), range_end: self.end_bound().cloned() }.into())
                         } else {
-                            OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
+                            Okay(Span::new(pos, curr_pos.clone()), curr_pos)
                         }
                     },
                     None => Error(UnexpectedEndError { pos: curr_pos }.into()),
@@ -144,7 +144,7 @@ macro_rules! impl_u32_range_for_char {
                         if !self.contains(&(actual_char as u32)) {
                             Error(ValueOutsideRangeError { pos, found: actual_char as u32, range_start: self.start_bound().cloned(), range_end: self.end_bound().cloned() }.into())
                         } else {
-                            OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
+                            Okay(Span::new(pos, curr_pos.clone()), curr_pos)
                         }
                     },
                     None => Error(UnexpectedEndError { pos: curr_pos }.into()),

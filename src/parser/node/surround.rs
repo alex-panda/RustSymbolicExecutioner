@@ -44,8 +44,7 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
     fn parse(&self, store: &Store, mut pos: Pos) -> ParseResult<(Ok1, Ok2, Ok3), Err, Pos> {
         use ParseResult::*;
         let ok1 = match self.child1.parse(store, pos.clone()) {
-            Okay(v) => v,
-            OkayAdvance(v, advance) => {
+            Okay(v, advance) => {
                 pos = advance;
                 v
             },
@@ -54,8 +53,7 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
         };
 
         let ok2 = match self.child2.parse(store, pos.clone()) {
-            Okay(v) => v,
-            OkayAdvance(v, advance) => {
+            Okay(v, advance) => {
                 pos = advance;
                 v
             },
@@ -64,8 +62,7 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
         };
 
         let ok3 = match self.child3.parse(store, pos.clone()) {
-            Okay(v) => v,
-            OkayAdvance(v, advance) => {
+            Okay(v, advance) => {
                 pos = advance;
                 v
             },
@@ -73,6 +70,6 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
             Panic(error) => return Panic(error),
         };
 
-        OkayAdvance((ok1, ok2, ok3), pos)
+        Okay((ok1, ok2, ok3), pos)
     }
 }

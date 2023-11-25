@@ -58,40 +58,33 @@ impl <Ok: Debug + Clone + 'static, Err: Debug + Clone + From<LRecError> + From<N
         // recurse (there are no descendants that don't recurse without making
         // progess to a new position) so we can just return the error.
         let (mut curr_ok, mut curr_pos) = match res {
-            Okay(ok) => (ok, pos.clone()),
-            OkayAdvance(ok, advance) => (ok, advance),
+            Okay(ok, advance) => (ok, advance),
             Error(error) => return Error(error),
             Panic(error) => return Panic(error),
         };
 
         loop {
             match self.child.parse(store, pos.clone()) {
-                Okay(_) => {
-                    // no advance
-                    self.mem_table.borrow_mut()
-                        .insert(key, Okay(curr_ok.clone()));
-                    return Okay(curr_ok);
-                },
-                OkayAdvance(ok, adv) => {
+                Okay(ok, adv) => {
                     if adv.key() <= curr_pos.key() {
                         // no advance
                         self.mem_table.borrow_mut()
-                            .insert(key, OkayAdvance(curr_ok.clone(), curr_pos.clone()));
-                        return OkayAdvance(curr_ok, curr_pos);
+                            .insert(key, Okay(curr_ok.clone(), curr_pos.clone()));
+                        return Okay(curr_ok, curr_pos);
                     }
 
                     curr_ok = ok;
                     curr_pos = adv;
-                    self.mem_table.borrow_mut().insert(key, OkayAdvance(curr_ok.clone(), curr_pos.clone()));
+                    self.mem_table.borrow_mut().insert(key, Okay(curr_ok.clone(), curr_pos.clone()));
                 },
                 Error(_) => {
                     // return last successful result
-                    self.mem_table.borrow_mut().insert(key, OkayAdvance(curr_ok.clone(), curr_pos.clone()));
-                    return OkayAdvance(curr_ok, curr_pos);
+                    self.mem_table.borrow_mut().insert(key, Okay(curr_ok.clone(), curr_pos.clone()));
+                    return Okay(curr_ok, curr_pos);
                 },
                 Panic(err) => {
                     // memoize last successful result
-                    self.mem_table.borrow_mut().insert(key, OkayAdvance(curr_ok.clone(), curr_pos.clone()));
+                    self.mem_table.borrow_mut().insert(key, Okay(curr_ok.clone(), curr_pos.clone()));
                     // return Panic
                     return Panic(err);
                 },

@@ -17,8 +17,7 @@ use ParseResult::*;
 impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Ok, Err, Store, Pos, V> for IsNode<Child, Ok, Err, Store, Pos, V> {
     fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Ok, Err, Pos> {
         match self.child.parse(store, pos.clone()) {
-            Okay(value) => Okay(value),
-            OkayAdvance(value, _) => Okay(value),
+            Okay(value, _) => Okay(value, pos),
             Error(error) => Error(error),
             Panic(error) => Panic(error),
         }
@@ -26,8 +25,7 @@ impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: P
     
     fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
         match self.child.parse_span(store, pos.clone()) {
-            Okay(_) => Okay(Span::new(pos.clone(), pos)),
-            OkayAdvance(_, advance) => Okay(Span::new(pos, advance)),
+            Okay(_, advance) => Okay(Span::new(pos.clone(), advance), pos),
             Error(error) => Error(error),
             Panic(error) => Panic(error),
         }

@@ -16,7 +16,7 @@ impl <Err: From<ExpectedEndError<Pos>>, Store: ParseStore<Pos, V>, Pos: ParsePos
     fn parse(&self, store: &Store, pos: Pos) -> ParseResult<(), Err, Pos> {
         match store.peek_at(&pos) {
             Some(_) => ParseResult::Error(ExpectedEndError { pos }.into()),
-            None => ParseResult::Okay(()),
+            None => ParseResult::Okay((), pos),
         }
     }
 }

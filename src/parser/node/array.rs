@@ -14,8 +14,7 @@ impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: P
 
         for len in 0..N {
             match self[len].parse(store, curr_pos.clone()) {
-                Okay(ok) => { accume[len].write(ok); },
-                OkayAdvance(ok, advance) => {
+                Okay(ok, advance) => {
                     // successfull parse so write the value
                     accume[len].write(ok);
                     curr_pos = advance;
@@ -31,7 +30,7 @@ impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: P
             }
         }
 
-        ParseResult::OkayAdvance(accume.map(|v| unsafe { v.assume_init() }), curr_pos)
+        ParseResult::Okay(accume.map(|v| unsafe { v.assume_init() }), curr_pos)
     }
 
     fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
@@ -40,14 +39,13 @@ impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: P
         // parse each child
         for child in self {
             match child.parse_span(store, curr_pos.clone()) {
-                Okay(_) => {},
-                OkayAdvance(_, advance) => { curr_pos = advance },
+                Okay(_, advance) => { curr_pos = advance },
                 Error(error) => return Error(error),
                 Panic(error) => return Panic(error),
             }
         }
 
         // return the parsed span
-        OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
+        Okay(Span::new(pos, curr_pos.clone()), curr_pos)
     }
 }

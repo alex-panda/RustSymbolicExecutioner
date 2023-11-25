@@ -21,8 +21,7 @@ impl <Ok, Err: From<NoAdvanceError<Pos>> + From<FailedFirstParseError<Pos, Err>>
 
         // try the first parse
         match self.child.parse(store, pos.clone()) {
-            Okay(_) => return Panic(NoAdvanceError { pos }.into()),
-            OkayAdvance(okay, advance) => {
+            Okay(okay, advance) => {
                 if pos.key() == advance.key() { return Panic(NoAdvanceError { pos }.into()); }
                 accume.push(okay);
                 pos = advance;
@@ -34,13 +33,12 @@ impl <Ok, Err: From<NoAdvanceError<Pos>> + From<FailedFirstParseError<Pos, Err>>
         // try all subsequent parses
         loop {
             match self.child.parse(store, pos.clone()) {
-                Okay(_) => return Panic(NoAdvanceError { pos }.into()),
-                OkayAdvance(okay, advance) => {
+                Okay(okay, advance) => {
                     if pos.key() == pos.key() { return Panic(NoAdvanceError { pos }.into()); }
                     accume.push(okay);
                     pos = advance;
                 },
-                Error(_) => return OkayAdvance(accume, pos),
+                Error(_) => return Okay(accume, pos),
                 Panic(err) => return Panic(err),
             }
         }
@@ -51,8 +49,7 @@ impl <Ok, Err: From<NoAdvanceError<Pos>> + From<FailedFirstParseError<Pos, Err>>
 
         // try first parse
         match self.child.parse_span(store, curr_pos.clone()) {
-            Okay(_) => return Panic(NoAdvanceError { pos }.into()),
-            OkayAdvance(_, advance) => {
+            Okay(_, advance) => {
                 if curr_pos.key() == advance.key() { return Panic(NoAdvanceError { pos }.into()) }
                 curr_pos = advance
             },
@@ -63,12 +60,11 @@ impl <Ok, Err: From<NoAdvanceError<Pos>> + From<FailedFirstParseError<Pos, Err>>
         // try all subsequent parses
         loop {
             match self.child.parse_span(store, curr_pos.clone()) {
-                Okay(_) => return Panic(NoAdvanceError { pos }.into()),
-                OkayAdvance(_, advance) => {
+                Okay(_, advance) => {
                     if curr_pos.key() == advance.key() { return Panic(NoAdvanceError { pos }.into()) }
                     curr_pos = advance
                 },
-                Error(_) => return OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos),
+                Error(_) => return Okay(Span::new(pos, curr_pos.clone()), curr_pos),
                 Panic(error) => return Panic(error),
             }
         }

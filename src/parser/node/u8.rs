@@ -9,7 +9,7 @@ impl <Err: From<UnexpectedValueError<Pos, char>> + From<UnexpectedEndError<Pos>>
         match store.value_at(&mut curr_pos) {
             Some(char) => {
                 if char == *self as _ {
-                    OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
+                    Okay(Span::new(pos, curr_pos.clone()), curr_pos)
                 } else {
                     Error(UnexpectedValueError { pos, found: char, expected: *self as _ }.into())
                 }

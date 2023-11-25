@@ -29,7 +29,7 @@ impl <Ok, Err: From<ValueOutsideSetError<Pos, V, N>> + From<UnexpectedEndError<P
         for v in &self.values {
             if &value == v {
                 // value was in the set
-                return OkayAdvance(value, new_pos);
+                return Okay(value, new_pos);
             }
         }
 

@@ -658,10 +658,7 @@ mod tests {
             let u = 6; 
             8 / 4; 
             5 - 2; } ") {
-            Okay(value) => {
-                println!("{:?}", value)
-            },
-            OkayAdvance(value, advance) => {
+            Okay(value, advance) => {
                 println!("{:?} {:?}", value, advance)
             },
             Error(error) => panic!("Error: {}", error),
@@ -672,10 +669,7 @@ mod tests {
     #[test]
     fn test_stmt_fn() {
         match parse_file(" fn hello() -> u8 {  (10 + 3) * 3 / 4 ^ (10); 10; 23; 0 } ") {
-            Okay(value) => {
-                println!("{:?}", value)
-            },
-            OkayAdvance(value, advance) => {
+            Okay(value, advance) => {
                 println!("{:?} {:?}", value, advance)
             },
             Error(error) => panic!("Error: {}", error),
@@ -686,10 +680,7 @@ mod tests {
     #[test]
     fn test_expr_fn() {
         match parse_file(" fn hello() -> u8 {  (10 + 3) * 3 / 4 ^ (10) } ") {
-            Okay(value) => {
-                println!("{:?}", value)
-            },
-            OkayAdvance(value, advance) => {
+            Okay(value, advance) => {
                 println!("{:?} {:?}", value, advance)
             },
             Error(error) => panic!("Error: {}", error),
@@ -700,10 +691,7 @@ mod tests {
     #[test]
     fn test_add_fn() {
         match parse_file(" fn hello() -> u8 {10 + 3}") {
-            Okay(value) => {
-                println!("{:?}", value)
-            },
-            OkayAdvance(value, advance) => {
+            Okay(value, advance) => {
                 println!("{:?} {:?}", value, advance)
             },
             Error(error) => panic!("Error: {}", error),
@@ -714,10 +702,7 @@ mod tests {
     #[test]
     fn test_empty_fn() {
         match parse_file(" fn hello() -> u8 {0}") {
-            Okay(value) => {
-                println!("{:?}", value)
-            },
-            OkayAdvance(value, advance) => {
+            Okay(value, advance) => {
                 println!("{:?} {:?}", value, advance)
             },
             Error(error) => panic!("Error: {}", error),
@@ -728,10 +713,7 @@ mod tests {
     #[test]
     fn test_empty() {
         match parse_file("") {
-            Okay(value) => {
-                assert!(value == File { funcs: Vec::new() });
-            },
-            OkayAdvance(value, advance) => {
+            Okay(value, advance) => {
                 assert!(value == File { funcs: Vec::new() });
                 assert!(advance == 0);
             },

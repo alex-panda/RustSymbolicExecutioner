@@ -17,7 +17,7 @@ impl <Err: From<UnexpectedEndError<Pos>> + From<UnexpectedValueError<Pos, char>>
             }
         }
 
-        OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
+        Okay(Span::new(pos, curr_pos.clone()), curr_pos)
     }
 }
 

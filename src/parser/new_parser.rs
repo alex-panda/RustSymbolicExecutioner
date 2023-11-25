@@ -1867,7 +1867,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     // unicode groups
     let xid_start = MapPValue(|span, ch| {
         if UnicodeXID::is_xid_start(ch) {
-            OkayAdvance(span.clone(), span.end)
+            Okay(span.clone(), span.end)
         } else {
             Error(format!("{}: (XID_START) expected character in the [:XID_Start:] unicode group", span.start))
         }
@@ -1876,7 +1876,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     let xid_continue = MapPValue(|span, ch| {
         if UnicodeXID::is_xid_continue(ch) {
-            OkayAdvance(span.clone(), span.end)
+            Okay(span.clone(), span.end)
         } else {
             Error(format!("{}: (XID_CONTINUE) expected character in the [:XID_Continue:] unicode group", span.start))
         }
@@ -2526,10 +2526,10 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
             use ParseResult::*;
             use AnyOf4::*;
             match res {
-                Okay(res) => {
+                Okay(res, adv) => {
                     match res {
-                        Child1(v) => Okay(RGenericArgsConst::Block(v)),
-                        Child2(v) => Okay(RGenericArgsConst::Lit(v)),
+                        Child1(v) => Okay(RGenericArgsConst::Block(v), adv),
+                        Child2(v) => Okay(RGenericArgsConst::Lit(v), adv),
                         Child3((span, (neg, _, lit))) => {
                             Panic(match lit {
                                 RLit::Char(_) => panic(span, "generic_args_const", "`Char` cannot have a sign"),
@@ -2538,32 +2538,12 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                                 RLit::Byte(_) => panic(span, "generic_args_const", "`ByteString` cannot have a sign"),
                                 RLit::ByteString(_) => panic(span, "generic_args_const", "`ByteString` cannot have a sign"),
                                 RLit::RawByteString(_) => panic(span, "generic_args_const", "`RawByteString` cannot have a sign"),
-                                RLit::Integer(lit) => return Okay(RGenericArgsConst::SLit(RSLit::Integer(RSIntLit { span: span, neg: true, lit }))),
-                                RLit::Float(lit) => return Okay(RGenericArgsConst::SLit(RSLit::Float(RSFloatLit { span: span, neg: true, lit }))),
+                                RLit::Integer(lit) => return Okay(RGenericArgsConst::SLit(RSLit::Integer(RSIntLit { span: span, neg: true, lit })), adv),
+                                RLit::Float(lit) => return Okay(RGenericArgsConst::SLit(RSLit::Float(RSFloatLit { span: span, neg: true, lit })), adv),
                                 RLit::Bool(_) => panic(span, "generic_args_const", "`Bool` cannot have a sign"),
                             })
                         },
-                        Child4(v) => Okay(RGenericArgsConst::PathSeg(v)),
-                    }
-                },
-                OkayAdvance(res, adv) => {
-                    match res {
-                        Child1(v) => OkayAdvance(RGenericArgsConst::Block(v), adv),
-                        Child2(v) => OkayAdvance(RGenericArgsConst::Lit(v), adv),
-                        Child3((span, (neg, _, lit))) => {
-                            Panic(match lit {
-                                RLit::Char(_) => panic(span, "generic_args_const", "`Char` cannot have a sign"),
-                                RLit::String(_) => panic(span, "generic_args_const", "`String` cannot have a sign"),
-                                RLit::RawString(_) => panic(span, "generic_args_const", "`RawString` cannot have a sign"),
-                                RLit::Byte(_) => panic(span, "generic_args_const", "`ByteString` cannot have a sign"),
-                                RLit::ByteString(_) => panic(span, "generic_args_const", "`ByteString` cannot have a sign"),
-                                RLit::RawByteString(_) => panic(span, "generic_args_const", "`RawByteString` cannot have a sign"),
-                                RLit::Integer(lit) => return OkayAdvance(RGenericArgsConst::SLit(RSLit::Integer(RSIntLit { span: span, neg: true, lit })), adv),
-                                RLit::Float(lit) => return OkayAdvance(RGenericArgsConst::SLit(RSLit::Float(RSFloatLit { span: span, neg: true, lit })), adv),
-                                RLit::Bool(_) => panic(span, "generic_args_const", "`Bool` cannot have a sign"),
-                            })
-                        },
-                        Child4(v) => OkayAdvance(RGenericArgsConst::PathSeg(v), adv),
+                        Child4(v) => Okay(RGenericArgsConst::PathSeg(v), adv),
                     }
                 },
                 Error(r) => Error(r),
@@ -2999,7 +2979,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         )),
         |res| {
             (match res {
-                Okay((span, _)) | OkayAdvance((span, _), _)
+                Okay((span, _), _)
                     => ParseResult::Panic(panic(span, "reserved_number", "this number is reserved and cannot be used")),
                 res => res
             }).map_value(|v|())
@@ -3157,7 +3137,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         )),
         |res| {
             match res {
-                Okay(span) | OkayAdvance(span, _) => {
+                Okay(span, _) => {
                     ParseResult::Panic(panic(span, "reserved_token_double_quote_rule", "this double quote token is reserved by Rust and therefore can not be used"))
                 },
                 res => res
@@ -3175,7 +3155,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         )),
         |res| {
             match res {
-                Okay(span) | OkayAdvance(span, _) => {
+                Okay(span, _) => {
                     ParseResult::Panic(panic(span, "reserved_token_single_quote_rule", "this single quote token is reserved by Rust and therefore cannot be used"))
                 },
                 res => res
@@ -3193,7 +3173,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         )),
         |res| {
             match res {
-                Okay(span) | OkayAdvance(span, _) => {
+                Okay(span, _) => {
                     ParseResult::Panic(panic(span, "reserved_token_pound_rule", "this pound token is reserved by Rust and therefore cannot be used"))
                 },
                 res => res
@@ -5261,7 +5241,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         |res| {
             use ParseResult::*;
             match res {
-                Okay((span, _)) | OkayAdvance((span, _), _) => {
+                Okay((span, _), _) => {
                     Panic(panic(span, "obsolete_range_pattern", "'...' is no longer valid Rust syntax"))
                 },
                 Error(e) => Error(e),

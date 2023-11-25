@@ -35,8 +35,7 @@ impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos,
         let mut out = core::array::from_fn(|_| None);
         for (i, child) in self.children.iter().enumerate() {
             match child.parse(store, pos.clone()) {
-                Okay(value) => return Okay(value),
-                OkayAdvance(value, advance) => return OkayAdvance(value, advance),
+                Okay(value, advance) => return Okay(value, advance),
                 Error(error) => out[i] = Some(error),
                 Panic(error) => return Panic(error),
             }
@@ -49,8 +48,7 @@ impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos,
         let mut out = core::array::from_fn(|_| None);
         for (i, child) in self.children.iter().enumerate() {
             match child.parse_span(store, pos.clone()) {
-                Okay(value) => return Okay(value),
-                OkayAdvance(value, advance) => return OkayAdvance(value, advance),
+                Okay(value, advance) => return Okay(value, advance),
                 Error(error) => out[i] = Some(error),
                 Panic(error) => return Panic(error),
             }
@@ -90,16 +88,14 @@ macro_rules! impl_one_of {
             impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, $num_children>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child1: ParseNode<Ok, Err, Store, Pos, V> $(,[<Child $num>]: ParseNode<Ok, Err, Store, Pos, V>)*> ParseNode<Ok, Err, Store, Pos, V> for [<Funnel $name Node>]<Child1 $(,[<Child $num>])*, Ok, Err, Store, Pos, V> {
                 fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Ok, Err, Pos> {
                     let error1 = match self.child1.parse(store, pos.clone()) {
-                        Okay(value) => return Okay(value),
-                        OkayAdvance(value, advance) => return OkayAdvance(value, advance),
+                        Okay(value, advance) => return Okay(value, advance),
                         Error(error) => error,
                         Panic(error) => return Panic(error),
                     };
 
                     $(
                         let [<error $num>] = match self.[<child $num>].parse(store, pos.clone()) {
-                            Okay(value) => return Okay(value),
-                            OkayAdvance(value, advance) => return OkayAdvance(value, advance),
+                            Okay(value, advance) => return Okay(value, advance),
                             Error(error) => error,
                             Panic(error) => return Panic(error),
                         };
@@ -110,16 +106,14 @@ macro_rules! impl_one_of {
 
                 fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
                     let error1 = match self.child1.parse_span(store, pos.clone()) {
-                        Okay(_) => return Okay(Span::new(pos.clone(), pos)),
-                        OkayAdvance(_, advance) => return OkayAdvance(Span::new(pos, advance.clone()), advance),
+                        Okay(_, advance) => return Okay(Span::new(pos, advance.clone()), advance),
                         Error(error) => error,
                         Panic(error) => return Panic(error),
                     };
 
                     $(
                         let [<error $num>] = match self.[<child $num>].parse_span(store, pos.clone()) {
-                            Okay(_) => return Okay(Span::new(pos.clone(), pos)),
-                            OkayAdvance(_, advance) => return OkayAdvance(Span::new(pos, advance.clone()), advance),
+                            Okay(_, advance) => return Okay(Span::new(pos, advance.clone()), advance),
                             Error(error) => error,
                             Panic(error) => return Panic(error),
                         };

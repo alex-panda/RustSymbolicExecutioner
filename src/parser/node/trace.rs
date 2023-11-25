@@ -17,9 +17,9 @@ pub struct TraceNode<F: Fn(), Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: 
 }
 
 impl <F: Fn(), Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<(), Err, Store, Pos, V> for TraceNode<F, Err, Store, Pos, V> {
-    fn parse(&self, _: &Store, _: Pos) -> ParseResult<(), Err, Pos> {
+    fn parse(&self, _: &Store, pos: Pos) -> ParseResult<(), Err, Pos> {
         (self.func)();
-        ParseResult::Okay(())
+        ParseResult::Okay((), pos)
     }
 }
 

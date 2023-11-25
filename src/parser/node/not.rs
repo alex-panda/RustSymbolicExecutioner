@@ -24,16 +24,16 @@ use ParseResult::*;
 impl <Ok, Err: From<UnexpectedSuccessError<Pos>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<(), Err, Store, Pos, V> for NotNode<Child, Ok, Err, Store, Pos, V> {
     fn parse(&self, store: &Store, pos: Pos) -> ParseResult<(), Err, Pos> {
         match self.child.parse_span(store, pos.clone()) {
-            Okay(_) | OkayAdvance(_, _) => Error(UnexpectedSuccessError { pos }.into()),
-            Error(_) => Okay(()),
+            Okay(_, _) => Error(UnexpectedSuccessError { pos }.into()),
+            Error(_) => Okay((), pos),
             Panic(err) => Panic(err),
         }
     }
 
     fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<crate::parser::Span<Pos>, Err, Pos> {
         match self.child.parse_span(store, pos.clone()) {
-            Okay(_) | OkayAdvance(_, _) => Error(UnexpectedSuccessError { pos }.into()),
-            Error(_) => Okay(Span::new(pos.clone(), pos)),
+            Okay(_, _) => Error(UnexpectedSuccessError { pos }.into()),
+            Error(_) => Okay(Span::new(pos.clone(), pos.clone()), pos),
             Panic(err) => Panic(err),
         }
     }

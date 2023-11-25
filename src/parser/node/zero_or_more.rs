@@ -25,13 +25,12 @@ impl <Ok, Err: From<NoAdvanceError<Pos>>, Store: ParseStore<Pos, V>, Pos: ParseP
 
         loop {
             match self.child.parse(store, pos.clone()) {
-                Okay(_) => return Panic(NoAdvanceError { pos }.into()),
-                OkayAdvance(okay, advance) => {
+                Okay(okay, advance) => {
                     if pos.key() == advance.key() { return Panic(NoAdvanceError { pos }.into()); }
                     accume.push(okay);
                     pos = advance;
                 },
-                Error(_) => return OkayAdvance(accume, pos),
+                Error(_) => return Okay(accume, pos),
                 Panic(err) => return Panic(err),
             }
         }
@@ -41,12 +40,11 @@ impl <Ok, Err: From<NoAdvanceError<Pos>>, Store: ParseStore<Pos, V>, Pos: ParseP
         let mut curr_pos = pos.clone();
         loop {
             match self.child.parse_span(store, curr_pos.clone()) {
-                Okay(_) => return Panic(NoAdvanceError { pos }.into()),
-                OkayAdvance(_, advance) => {
+                Okay(_, advance) => {
                     if pos.key() == advance.key() { return Panic(NoAdvanceError { pos }.into()); }
                     curr_pos = advance;
                 },
-                Error(_) => return OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos),
+                Error(_) => return Okay(Span::new(pos, curr_pos.clone()), curr_pos),
                 Panic(err) => return Panic(err),
             }
         }

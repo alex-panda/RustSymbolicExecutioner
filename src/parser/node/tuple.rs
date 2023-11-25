@@ -7,8 +7,7 @@ macro_rules! handle_result {
     ($res: expr, $pos: expr) => {
         {
             match $res {
-                ParseResult::Okay(v1) => { v1 },
-                ParseResult::OkayAdvance(v1, new_pos) => { $pos = new_pos; v1 },
+                ParseResult::Okay(v1, new_pos) => { $pos = new_pos; v1 },
                 ParseResult::Error(err) => { return Error(err) },
                 ParseResult::Panic(err) => { return Panic(err) },
             }
@@ -18,15 +17,15 @@ macro_rules! handle_result {
 
 // impl parse node for empty tuple
 impl <Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<(), Err, Store, Pos, V> for () {
-    fn parse(&self, _store: &Store, _pos: Pos) -> ParseResult<(), Err, Pos> {
-        Okay(())
+    fn parse(&self, _store: &Store, pos: Pos) -> ParseResult<(), Err, Pos> {
+        Okay((), pos)
     }
 }
 
 // impl parse node for tuple with one element
 impl <Ok0, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child0: ParseNode<Ok0, Err, Store, Pos, V>> ParseNode<(Ok0,), Err, Store, Pos, V> for (Child0,) {
     fn parse(&self, store: &Store, mut pos: Pos) -> ParseResult<(Ok0,), Err, Pos> {
-        OkayAdvance((
+        Okay((
             handle_result!(self.0.parse(store, pos.clone()), pos),
         ), pos)
     }
@@ -39,7 +38,7 @@ macro_rules! impl_tuple {
         paste! {
             impl <Ok0 $(,[<Ok $num>])*, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child0: ParseNode<Ok0, Err, Store, Pos, V> $(, [<Child $num>]: ParseNode<[<Ok $num>], Err, Store, Pos, V>)*> ParseNode<(Ok0 $(,[<Ok $num>])*), Err, Store, Pos, V> for (Child0 $(,[<Child $num>])*) {
                 fn parse(&self, store: &Store, mut pos: Pos) -> ParseResult<(Ok0, $([<Ok $num>],)*), Err, Pos> {
-                    OkayAdvance((
+                    Okay((
                         handle_result!(self.0.parse(store, pos.clone()), pos),
                         $(handle_result!(self.$num.parse(store, pos.clone()), pos),)*
                     ), pos)
@@ -51,7 +50,7 @@ macro_rules! impl_tuple {
                     handle_result!(self.0.parse_span(store, pos.clone()), curr_pos);
                     $(handle_result!(self.$num.parse_span(store, pos.clone()), curr_pos);)*
 
-                    OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
+                    Okay(Span::new(pos, curr_pos.clone()), curr_pos)
                 }
             }
         }

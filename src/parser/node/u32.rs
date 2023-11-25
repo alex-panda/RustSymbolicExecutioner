@@ -10,7 +10,7 @@ impl <Err: From<UnexpectedValueError<Pos, u32>> + From<UnexpectedEndError<Pos>>,
         match store.value_at(&mut curr_pos) {
             Some(char) => {
                 if (char as u32) == *self {
-                    OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
+                    Okay(Span::new(pos, curr_pos.clone()), curr_pos)
                 } else {
                     Error(UnexpectedValueError { pos, found: char as u32, expected: *self }.into())
                 }
