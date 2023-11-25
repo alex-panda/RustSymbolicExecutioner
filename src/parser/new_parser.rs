@@ -4343,10 +4343,10 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     //srule!(negate, negate_rule);
     //expr_rule.set();
 
-    expression_rule.set(LRec(Funnel2(
+    expression_rule.set(Funnel2(
         expression_without_block,
         expression_with_block,
-    )));
+    ));
 
     expression_without_block_rule.set(MapV(Map((
             ZeroOrMore((outer_attribute, w)),
