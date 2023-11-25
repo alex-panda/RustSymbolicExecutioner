@@ -53,7 +53,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_new_assert() {
+    pub fn test_new_assert() -> Result<(), Box<dyn std::error::Error>> {
         let mut engines: Vec<SymExEngine> = Vec::new();
         pather::new_engine(&mut engines);
         pather::new_engine(&mut engines);
@@ -62,7 +62,11 @@ mod tests {
         engines[1].assign_symvar_value("x + 4".to_string(), "x".to_string());
         engines[1].assign_symvar_value("x * 2".to_string(), "y".to_string());
         new_assert(&mut engines, 1, "y = 18".to_string());
+    
+        let is_sat = engines[2].pi.s.check_sat()?;
         println!("{}", engines[2].to_string());
+        assert!(is_sat);
+        Ok(())
     }
 
 }

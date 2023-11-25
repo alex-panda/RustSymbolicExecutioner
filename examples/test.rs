@@ -62,8 +62,8 @@ fn b2_ifStmt(mut x:i32, mut y:i32) -> u8 {
         if x >= 5 {
             y = x;
         }
-        x = y * 2;
-        //symex
+        y = y + 1;
+        //symex - what values can y have?
     }
     return 0;
 }
@@ -99,4 +99,12 @@ fn b_loop(n: i64)
         i = i + 1;
     }
     //symex - what is the value of i
+}
+
+fn b_infLoop(n: i64) {
+    let mut i = 0;
+    let mut j = 1;
+    while i < n {
+        j = j * 2;
+    }
 }

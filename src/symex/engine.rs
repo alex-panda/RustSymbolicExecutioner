@@ -91,6 +91,7 @@ impl SymExEngine {
         let var0_assert = self.display_as_var0(assert.clone());
         let and_assert = " && ".to_owned() + &var0_assert;
         self.pi.add_assertion_to_pi_str(&and_assert);
+        self.pi.add_assertion_to_solver(&assert);
     }
 }
 
