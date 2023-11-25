@@ -4,9 +4,6 @@ use std::fmt::Debug;
 use ParseResult::*;
 use zst::ZST;
 
-use paste::paste;
-
-
 /// 
 /// The constructor for the `OneOf` parse node.
 /// 
@@ -67,80 +64,61 @@ impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos,
 }
 
 macro_rules! impl_one_of {
-    ($num_children: tt, $name: tt, $($num: tt,)+) => {
-        paste! {
-            #[allow(non_snake_case)]
-            pub fn [<OneOf $name>]<Child1 $(, [<Child $num>])*, Ok1 $(,[<Ok $num>])*, Err: From<AllChildrenFailedError<Pos, Err, $num_children>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>(child1: Child1 $(,[<child $num>]: [<Child $num>])*) -> [<OneOf $name Node>]<Child1 $(, [<Child $num>])*, Ok1 $(, [<Ok $num>])*, Err, Store, Pos, V> {
-                [<OneOf $name Node>] {
-                    _zst: ZSTNode::default(),
-                    child1,
-                    $([<child $num>],)*
-                    _ok1: ZST::default(),
-                    $([<_ok $num>]: ZST::default(),)*
-                }
+    ($fn_id: ident, $node_id: ident, $any_of_id: ident, $num: tt, $($lower_child_id: ident | $child_id: ident | $lower_ok_id: ident | $ok_id: ident),*) => {
+        #[allow(non_snake_case)]
+        pub fn $fn_id<$($child_id: ParseNode<$ok_id, Err, Store, Pos, V>),*, $($ok_id),*, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>($($lower_child_id: $child_id),*) -> $node_id<$($child_id),*, $($ok_id),*, Err, Store, Pos, V> {
+            $node_id {
+                _zst: ZSTNode::default(),
+                $($lower_child_id),*,
+                $($lower_ok_id: Default::default()),*,
             }
+        }
 
-            #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-            pub struct [<OneOf $name Node>]<Child1 $(, [<Child $num>])*, Ok1 $(, [<Ok $num>])*, Err: From<AllChildrenFailedError<Pos, Err, $num_children>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> {
-                _zst: ZSTNode<(), Err, Store, Pos, V>,
-                pub child1: Child1,
-                $(pub [<child $num>]: [<Child $num>],)*
-                _ok1: ZST<Ok1>,
-                $([<_ok $num>]: ZST<[<Ok $num>]>,)*
-            }
+        #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub struct $node_id<$($child_id),*, $($ok_id),*, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> {
+            _zst: ZSTNode<(), Err, Store, Pos, V>,
+            $($lower_child_id:$child_id),*,
+            $($lower_ok_id: ZST<$ok_id>),*,
+        }
 
-            impl <Ok1 $(,[<Ok $num>])*, Err: From<AllChildrenFailedError<Pos, Err, $num_children>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child1: ParseNode<Ok1, Err, Store, Pos, V> $(,[<Child $num>]: ParseNode<[<Ok $num>], Err, Store, Pos, V>)*> ParseNode<[<AnyOf $name>]<Ok1 $(,[<Ok $num>])*>, Err, Store, Pos, V> for [<OneOf $name Node>]<Child1 $(,[<Child $num>])*, Ok1 $(,[<Ok $num>])*, Err, Store, Pos, V> {
-                fn parse(&self, store: &Store, pos: Pos) -> ParseResult<[<AnyOf $name>]<Ok1 $(,[<Ok $num>])*>, Err, Pos> {
-                    let error1 = match self.child1.parse(store, pos.clone()) {
-                        Okay(value, advance) => return Okay([<AnyOf $name>]::Child1(value), advance),
+        impl <$($child_id: ParseNode<$ok_id, Err, Store, Pos, V>),*, $($ok_id),*, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<$any_of_id<$($ok_id),*>, Err, Store, Pos, V> for $node_id<$($child_id),*, $($ok_id),*, Err, Store, Pos, V> {
+            fn parse(&self, store: &Store, pos: Pos) -> ParseResult<$any_of_id<$($ok_id),*>, Err, Pos> {
+                let errors = [$(
+                    match self.$lower_child_id.parse(store, pos.clone()) {
+                        Okay(value, advance) => return Okay($any_of_id::$child_id(value), advance),
                         Error(error) => error,
                         Panic(error) => return Panic(error),
-                    };
+                    },
+                )*];
 
-                    $(
-                        let [<error $num>] = match self.[<child $num>].parse(store, pos.clone()) {
-                            Okay(value, advance) => return Okay([<AnyOf $name>]::[<Child $num>](value), advance),
-                            Error(error) => error,
-                            Panic(error) => return Panic(error),
-                        };
-                    )*
+                Error(Err::from(AllChildrenFailedError { pos, errors }))
+            }
 
-                    Error(AllChildrenFailedError { pos, errors: [error1 $(,[<error $num>])*] }.into())
-                }
-
-                fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
-                    let error1 = match self.child1.parse_span(store, pos.clone()) {
+            fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+                let errors = [$(
+                    match self.$lower_child_id.parse_span(store, pos.clone()) {
                         Okay(_, advance) => return Okay(Span::new(pos, advance.clone()), advance),
                         Error(error) => error,
                         Panic(error) => return Panic(error),
-                    };
+                    },
+                )*];
 
-                    $(
-                        let [<error $num>] = match self.[<child $num>].parse_span(store, pos.clone()) {
-                            Okay(_, advance) => return Okay(Span::new(pos, advance.clone()), advance),
-                            Error(error) => error,
-                            Panic(error) => return Panic(error),
-                        };
-                    )*
-
-                    Error(AllChildrenFailedError { pos, errors: [error1 $(,[<error $num>])*] }.into())
-                }
+                Error(Err::from(AllChildrenFailedError { pos, errors }))
             }
+        }
 
-            #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-            pub enum [<AnyOf $name>]<O1 $(,[<O $num>])*> {
-                Child1(O1),
-                $([<Child $num>]([<O $num>]),)*
-            }
+        #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub enum $any_of_id<$($ok_id),*> {
+            $($child_id($ok_id)),*,
         }
     };
 }
 
-impl_one_of!(2, 2, 2,);
-impl_one_of!(3, 3, 2, 3,);
-impl_one_of!(4, 4, 2, 3, 4,);
-impl_one_of!(5, 5, 2, 3, 4, 5,);
-impl_one_of!(6, 6, 2, 3, 4, 5, 6,);
-impl_one_of!(7, 7, 2, 3, 4, 5, 6, 7,);
-impl_one_of!(8, 8, 2, 3, 4, 5, 6, 7, 8,);
-impl_one_of!(9, 9, 2, 3, 4, 5, 6, 7, 8, 9,);
+impl_one_of!(OneOf2, OneOf2Node, AnyOf2, 2, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2);
+impl_one_of!(OneOf3, OneOf3Node, AnyOf3, 3, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3);
+impl_one_of!(OneOf4, OneOf4Node, AnyOf4, 4, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4);
+impl_one_of!(OneOf5, OneOf5Node, AnyOf5, 5, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5);
+impl_one_of!(OneOf6, OneOf6Node, AnyOf6, 6, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6);
+impl_one_of!(OneOf7, OneOf7Node, AnyOf7, 7, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6, child7 | Child7 | ok7 | Ok7);
+impl_one_of!(OneOf8, OneOf8Node, AnyOf8, 8, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6, child7 | Child7 | ok7 | Ok7, child8 | Child8 | ok8 | Ok8);
+impl_one_of!(OneOf9, OneOf9Node, AnyOf9, 9, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6, child7 | Child7 | ok7 | Ok7, child8 | Child8 | ok8 | Ok8, child9 | Child9 | ok9 | Ok9);
