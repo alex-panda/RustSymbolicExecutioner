@@ -1,6 +1,3 @@
-mod lrec_error;
-pub use lrec_error::*;
-
 mod empty_rule_error;
 pub use empty_rule_error::*;
 

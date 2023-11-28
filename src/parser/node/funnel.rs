@@ -1,3 +1,5 @@
+use crate::parser::ParseContext;
+
 use super::super::{ParseStore, ParsePos, ParseValue, ParseNode, ParseResult, AllChildrenFailedError, ZSTNode, Span};
 
 use ParseResult::*;
@@ -12,7 +14,7 @@ use zst::ZST;
 /// node instead (where `*` is a number of children the node has).
 /// 
 #[allow(non_snake_case)]
-pub fn Funnel<Child, Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, const N: usize>(children: [Child; N]) -> FunnelNode<Child, Ok, Err, Store, Pos, V, N> {
+pub fn Funnel<Child, Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, const N: usize>(children: [Child; N]) -> FunnelNode<Child, Ok, Err, Store, Pos, V, N> {
     FunnelNode {
         children,
         _zst: ZSTNode::default(),
@@ -20,39 +22,44 @@ pub fn Funnel<Child, Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: 
     }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FunnelNode<Child, Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, const N: usize> {
+pub struct FunnelNode<Child, Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, const N: usize> {
     children: [Child; N],
     _zst: ZSTNode<Child, Err, Store, Pos, V>,
     _ok1: ZST<Ok>,
 }
 
 
-impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>, const N: usize> ParseNode<Ok, Err, Store, Pos, V> for FunnelNode<Child, Ok, Err, Store, Pos, V, N> {
-    fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Ok, Err, Pos> {
+impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>, const N: usize> ParseNode<Ok, Err, Store, Pos, V> for FunnelNode<Child, Ok, Err, Store, Pos, V, N> {
+    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
         let mut out = core::array::from_fn(|_| None);
         for (i, child) in self.children.iter().enumerate() {
-            match child.parse(store, pos.clone()) {
+            match child.do_parse(cxt.clone()) {
                 Okay(value, advance) => return Okay(value, advance),
                 Error(error) => out[i] = Some(error),
                 Panic(error) => return Panic(error),
             }
         }
 
-        Error(AllChildrenFailedError { pos, errors: out.map(|v| if let Some(v) = v { v } else { panic!("`Funnel` node expected either success or {} errors, but less errors than expected were given", N) }) }.into())
+        Error(AllChildrenFailedError { pos: cxt.pos, errors: out.map(|v| if let Some(v) = v { v } else { panic!("`Funnel` node expected either success or {} errors, but less errors than expected were given", N) }) }.into())
     }
 
-    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+    fn do_parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
         let mut out = core::array::from_fn(|_| None);
         for (i, child) in self.children.iter().enumerate() {
-            match child.parse_span(store, pos.clone()) {
+            match child.do_parse_span(cxt.clone()) {
                 Okay(value, advance) => return Okay(value, advance),
                 Error(error) => out[i] = Some(error),
                 Panic(error) => return Panic(error),
             }
         }
 
-        Error(AllChildrenFailedError { pos, errors: out.map(|v| if let Some(v) = v { v } else { panic!("`Funnel` node expected either success or {} errors, but less errors than expected were given", N) }) }.into())
+        Error(AllChildrenFailedError { pos: cxt.pos, errors: out.map(|v| if let Some(v) = v { v } else { panic!("`Funnel` node expected either success or {} errors, but less errors than expected were given", N) }) }.into())
+    }
+}
+
+impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V> + Clone, const N: usize> Clone for FunnelNode<Child, Ok, Err, Store, Pos, V, N> {
+    fn clone(&self) -> Self {
+        Self { children: self.children.clone(), _zst: self._zst.clone(), _ok1: Default::default() }
     }
 }
 
@@ -67,7 +74,7 @@ macro_rules! impl_one_of {
         /// node has).
         /// 
         #[allow(non_snake_case)]
-        pub fn $fn_id<$($child_id: ParseNode<Ok, Err, Store, Pos, V>),*, Ok, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>($($lower_child_id: $child_id),*) -> $node_id<$($child_id),*, Ok, Err, Store, Pos, V> {
+        pub fn $fn_id<$($child_id: ParseNode<Ok, Err, Store, Pos, V>),*, Ok, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>($($lower_child_id: $child_id),*) -> $node_id<$($child_id),*, Ok, Err, Store, Pos, V> {
             $node_id {
                 _zst: ZSTNode::default(),
                 $($lower_child_id),*,
@@ -75,34 +82,34 @@ macro_rules! impl_one_of {
         }
 
         #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-        pub struct $node_id<$($child_id),*, Ok, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> {
+        pub struct $node_id<$($child_id),*, Ok, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> {
             _zst: ZSTNode<Ok, Err, Store, Pos, V>,
             $($lower_child_id:$child_id),*,
         }
 
-        impl <$($child_id: ParseNode<Ok, Err, Store, Pos, V>),*, Ok, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<Ok, Err, Store, Pos, V> for $node_id<$($child_id),*, Ok, Err, Store, Pos, V> {
-            fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Ok, Err, Pos> {
+        impl <$($child_id: ParseNode<Ok, Err, Store, Pos, V>),*, Ok, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<Ok, Err, Store, Pos, V> for $node_id<$($child_id),*, Ok, Err, Store, Pos, V> {
+            fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
                 let errors = [$(
-                    match self.$lower_child_id.parse(store, pos.clone()) {
+                    match self.$lower_child_id.do_parse(cxt.clone()) {
                         Okay(value, advance) => return Okay(value, advance),
                         Error(error) => error,
                         Panic(error) => return Panic(error),
                     },
                 )*];
 
-                Error(Err::from(AllChildrenFailedError { pos, errors }))
+                Error(Err::from(AllChildrenFailedError { pos: cxt.pos, errors }))
             }
 
-            fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+            fn do_parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
                 let errors = [$(
-                    match self.$lower_child_id.parse_span(store, pos.clone()) {
-                        Okay(_, advance) => return Okay(Span::new(pos, advance.clone()), advance),
+                    match self.$lower_child_id.do_parse_span(cxt.clone()) {
+                        Okay(_, advance) => return Okay(Span::new(cxt.pos, advance.clone()), advance),
                         Error(error) => error,
                         Panic(error) => return Panic(error),
                     },
                 )*];
 
-                Error(Err::from(AllChildrenFailedError { pos, errors }))
+                Error(Err::from(AllChildrenFailedError { pos: cxt.pos, errors }))
             }
         }
     };

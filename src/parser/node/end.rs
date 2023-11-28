@@ -1,22 +1,19 @@
-use crate::parser::{ExpectedEndError, ZSTNode};
+use crate::parser::{ExpectedEndError, ParseContext};
 
 use super::super::{ParseValue, ParseStore, ParsePos, ParseNode, ParseResult};
 
 #[allow(non_snake_case)]
-pub fn End<Err: From<ExpectedEndError<Pos>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>() -> EndNode<Err, Store, Pos, V> {
-    EndNode { _zst: ZSTNode::default() }
+pub fn End() -> EndNode {
+    EndNode
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct EndNode<Err: From<ExpectedEndError<Pos>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> {
-    _zst: ZSTNode<(), Err, Store, Pos, V>
-}
+pub struct EndNode;
 
-impl <Err: From<ExpectedEndError<Pos>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<(), Err, Store, Pos, V> for EndNode<Err, Store, Pos, V> {
-    fn parse(&self, store: &Store, pos: Pos) -> ParseResult<(), Err, Pos> {
-        match store.peek_at(&pos) {
-            Some(_) => ParseResult::Error(ExpectedEndError { pos }.into()),
-            None => ParseResult::Okay((), pos),
+impl <Err: From<ExpectedEndError<Pos>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<(), Err, Store, Pos, V> for EndNode {
+    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<(), Err, Pos> {
+        match cxt.peek() {
+            Some(_) => ParseResult::Error(ExpectedEndError { pos: cxt.pos }.into()),
+            None => ParseResult::Okay((), cxt.pos),
         }
     }
 }

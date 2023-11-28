@@ -1,11 +1,13 @@
+use crate::parser::ParseContext;
+
 use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult, Span};
 
 use ParseResult::*;
 
 // impl parse node for empty tuple
-impl <Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<(), Err, Store, Pos, V> for () {
-    fn parse(&self, _store: &Store, pos: Pos) -> ParseResult<(), Err, Pos> {
-        Okay((), pos)
+impl <Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<(), Err, Store, Pos, V> for () {
+    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<(), Err, Pos> {
+        Okay((), cxt.pos)
     }
 }
 
@@ -13,27 +15,27 @@ impl <Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<()
 
 macro_rules! impl_tuple {
     ($($child_id: ident | $ok_id: ident | $num: tt),*) => {
-        impl <$($ok_id),*, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, $($child_id: ParseNode<$ok_id, Err, Store, Pos, V>),*> ParseNode<($($ok_id),*,), Err, Store, Pos, V> for ($($child_id),*,) {
-            fn parse(&self, store: &Store, mut pos: Pos) -> ParseResult<($($ok_id),*,), Err, Pos> {
+        impl <$($ok_id),*, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, $($child_id: ParseNode<$ok_id, Err, Store, Pos, V>),*> ParseNode<($($ok_id),*,), Err, Store, Pos, V> for ($($child_id),*,) {
+            fn do_parse<'a>(&self, mut cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<($($ok_id),*,), Err, Pos> {
                 Okay((
-                    $(match self.$num.parse(store, pos.clone()) {
-                        ParseResult::Okay(v1, new_pos) => { pos = new_pos; v1 },
+                    $(match self.$num.do_parse(cxt.clone()) {
+                        ParseResult::Okay(v1, new_pos) => { cxt.pos = new_pos; v1 },
                         ParseResult::Error(err) => { return Error(err) },
                         ParseResult::Panic(err) => { return Panic(err) },
                     }),*,
-                ), pos)
+                ), cxt.pos)
             }
 
-            fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
-                let mut curr_pos = pos.clone();
+            fn do_parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
+                let mut _curr_pos = cxt.pos.clone();
 
-                $(match self.$num.parse(store, curr_pos.clone()) {
-                    ParseResult::Okay(_, new_pos) => { curr_pos = new_pos; },
+                $(match self.$num.do_parse_span(cxt.clone()) {
+                    ParseResult::Okay(_, new_pos) => { _curr_pos = new_pos; },
                     ParseResult::Error(err) => { return Error(err) },
                     ParseResult::Panic(err) => { return Panic(err) },
                 });*
 
-                Okay(Span::new(pos, curr_pos.clone()), curr_pos)
+                Okay(Span::new(cxt.pos, _curr_pos.clone()), _curr_pos)
             }
         }
     };

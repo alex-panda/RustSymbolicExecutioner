@@ -1,4 +1,4 @@
-use crate::parser::{Span, UnexpectedEndError};
+use crate::parser::{Span, UnexpectedEndError, ParseContext};
 
 use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult};
 
@@ -10,16 +10,16 @@ use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult};
 pub struct AnyV;
 
 use ParseResult::*;
-impl <Err: From<UnexpectedEndError<Pos>>, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseNode<Span<Pos>, Err, Store, Pos, V> for AnyV {
-    fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
-        let mut curr_pos = pos.clone();
-        match store.value_at(&mut curr_pos) {
-            Some(_) => Okay(Span::new(pos, curr_pos.clone()), curr_pos),
-            None => Error(UnexpectedEndError { pos }.into()),
+impl <Err: From<UnexpectedEndError<Pos>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<Span<Pos>, Err, Store, Pos, V> for AnyV {
+    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
+        let mut curr_pos = cxt.pos.clone();
+        match cxt.store.value_at(&mut curr_pos) {
+            Some(_) => Okay(Span::new(cxt.pos, curr_pos.clone()), curr_pos),
+            None => Error(UnexpectedEndError { pos: cxt.pos }.into()),
         }
     }
 
-    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
-        self.parse(store, pos)
+    fn do_parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
+        self.do_parse(cxt)
     }
 }

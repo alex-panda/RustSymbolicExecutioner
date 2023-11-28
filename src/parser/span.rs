@@ -5,7 +5,7 @@ use super::{ParsePos, ParseStore, ParseValue};
 /// 
 /// A span of values in the store.
 /// 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Span<Pos: ParsePos> {
     /// The start position of the span (inclusive).
     pub start: Pos,
@@ -43,11 +43,17 @@ impl <Pos: ParsePos> Clone for Span<Pos> {
     }
 }
 
+impl <Pos: ParsePos> std::fmt::Debug for Span<Pos> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
 impl <Pos: ParsePos> Display for Span<Pos> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("[")?;
         Display::fmt(&self.start, f)?;
-        f.write_str("]-(")?;
+        f.write_str("-")?;
         Display::fmt(&self.end, f)?;
         f.write_str(")")
     }

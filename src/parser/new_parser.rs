@@ -9,7 +9,7 @@ use unicode_xid::UnicodeXID;
 /// 
 /// A parse position the parser.
 /// 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct PPos {
     /// The byte index in the `str`
     pub index: usize,
@@ -30,23 +30,30 @@ impl PPos {
     }
 }
 
+impl std::fmt::Debug for PPos {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
 impl Display for PPos {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.index, f)?;
-        f.write_str(":")?;
         Display::fmt(&self.line, f)?;
         f.write_str(":")?;
-        Display::fmt(&self.column, f)
+        Display::fmt(&self.column, f)?;
+        f.write_str(":")?;
+        Display::fmt(&self.index, f)
     }
 }
 
 impl ParsePos for PPos {
+    type Key = usize;
     fn key(&self) -> usize {
         self.index
     }
 }
 
-impl ParseStore<PPos, char> for &str {
+impl ParseStore<PPos, char> for str {
     fn value_at(&self, pos: &mut PPos) -> Option<char> {
         if let Some(ch) = self.value_at(&mut pos.index) {
             if ch == '\n' {
@@ -59,6 +66,12 @@ impl ParseStore<PPos, char> for &str {
         } else {
             None
         }
+    }
+}
+
+impl ParseStore<PPos, char> for &str {
+    fn value_at(&self, pos: &mut PPos) -> Option<char> {
+        (**self).value_at(pos)
     }
 }
 
@@ -1847,20 +1860,20 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     let reserved_keywords = OneOf(
         [KW_ABSTRACT, KW_BECOME, KW_BOX, KW_DO, KW_FINAL, KW_MACRO, KW_OVERRIDE, KW_PRIV, KW_TYPEOF, KW_UNSIZED, KW_VIRTUAL, KW_YIELD, KW_TRY]
     );
-    let reserved_keywords: &dyn ParseNode<Span<PPos>, String, &str, PPos, char> = &reserved_keywords;
+    let reserved_keywords: &dyn ParseNode<Span<PPos>, String, _, PPos, char> = &reserved_keywords;
 
     // weak keywords
-    const KW_MACRO_RULES: &str = "macro_rules";
-    const KW_UNION: &str = "union";
-    const KW_STATIC_LIFETIME: &str = "'static";
+//    const KW_MACRO_RULES: &str = "macro_rules";
+//    const KW_UNION: &str = "union";
+//    const KW_STATIC_LIFETIME: &str = "'static";
 
-    let weak_keywords = OneOf(
-        [KW_MACRO_RULES, KW_UNION, KW_STATIC_LIFETIME]
-    );
-    let weak_keywords: &dyn ParseNode<Span<PPos>, String, &str, PPos, char> = &weak_keywords;
+//    let weak_keywords = OneOf(
+//        [KW_MACRO_RULES, KW_UNION, KW_STATIC_LIFETIME]
+//    );
+//    let weak_keywords: &dyn ParseNode<Span<PPos>, String, _, PPos, char> = &weak_keywords;
 
     let isolated_cr = SpanOf(('\r', Not('\n')));
-    let isolated_cr: &dyn ParseNode<Span<PPos>, String, &str, PPos, char> = &isolated_cr;
+    let isolated_cr = &isolated_cr;
 
     // IDENTIFIERS
 
@@ -1949,7 +1962,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     srule!(maybe_named_function_parameters, maybe_named_function_parameters_rule);
     srule!(maybe_named_param, maybe_named_param_rule);
     srule!(maybe_named_function_parameters_variadic, maybe_named_function_parameters_variadic_rule);
-    srule!(delim_token_tree, delim_token_tree_rule, RDelimTokenTree, String, &str, PPos, char);
+    srule!(delim_token_tree, delim_token_tree_rule, RDelimTokenTree, String, _, PPos, char);
     srule!(token_tree, token_tree_rule);
     srule!(macro_invocation_semi, macro_invocation_semi_rule);
     srule!(block_comment_or_doc, block_comment_or_doc_rule);
@@ -3336,6 +3349,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
             Req(End(), |_, pos, _| format!("{}: parser failed to reach the end of the file (from this pos)", pos))
         ),
         |(_, utf8bom, shebang, _, items, _)| {
+            println!("Crate!");
             RCrate {
                 utf8bom: utf8bom.map(|(s, _)|s),
                 shebang: shebang.map(|(s, _)|s),
@@ -3467,7 +3481,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     // --- ITEMS ---
 
-    item_rule.set(MapV((
+    item_rule.set(Map(MapV((
             ZeroOrMore((outer_attribute, w)),
             OneOf2(
                 vis_item,
@@ -3481,11 +3495,11 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                 Child2(i) => RItem::MacroItem(i),
             }
         }
-    ));
+    ), |r| { println!("Item: {:?}", r); r}));
 
     vis_item_rule.set(MapV(Spanned((
             Maybe(visibility),
-            OneOf9(
+            OneOf13(
                 module,
                 extern_crate,
                 use_declaration,
@@ -3494,31 +3508,29 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                 _struct,
                 enumeration,
                 _union,
-                OneOf5(
-                    constant_item,
-                    static_item,
-                    _trait,
-                    implementation,
-                    extern_block
-                )
+                constant_item,
+                static_item,
+                _trait,
+                implementation,
+                extern_block
             )
         )),
         |(span, (vis, item))| {
-            use AnyOf9::*;
+            use AnyOf13::*;
             match item {
-                Child1(val) => RVisItem::Mod { span, vis, val },
-                Child2(val) => RVisItem::ExternCrate { span, vis, val },
-                Child3(val) => RVisItem::UseDecl { span, vis, val },
-                Child4(val) => RVisItem::Fn { span, vis, val },
-                Child5(val) => RVisItem::TypeAlias { span, vis, val },
-                Child6(val) => RVisItem::Struct { span, vis, val },
-                Child7(val) => RVisItem::Enum { span, vis, val },
-                Child8(val) => RVisItem::Union { span, vis, val },
-                Child9(AnyOf5::Child1(val)) => RVisItem::Const { span, vis, val },
-                Child9(AnyOf5::Child2(val)) => RVisItem::Static { span, vis, val },
-                Child9(AnyOf5::Child3(val)) => RVisItem::Trait { span, vis, val },
-                Child9(AnyOf5::Child4(val)) => RVisItem::Impl { span, vis, val },
-                Child9(AnyOf5::Child5(val)) => RVisItem::ExternBlock { span, vis, val },
+                Child1(val)  => RVisItem::Mod { span, vis, val },
+                Child2(val)  => RVisItem::ExternCrate { span, vis, val },
+                Child3(val)  => RVisItem::UseDecl { span, vis, val },
+                Child4(val)  => RVisItem::Fn { span, vis, val },
+                Child5(val)  => RVisItem::TypeAlias { span, vis, val },
+                Child6(val)  => RVisItem::Struct { span, vis, val },
+                Child7(val)  => RVisItem::Enum { span, vis, val },
+                Child8(val)  => RVisItem::Union { span, vis, val },
+                Child9(val)  => RVisItem::Const { span, vis, val },
+                Child10(val) => RVisItem::Static { span, vis, val },
+                Child11(val) => RVisItem::Trait { span, vis, val },
+                Child12(val) => RVisItem::Impl { span, vis, val },
+                Child13(val) => RVisItem::ExternBlock { span, vis, val },
             }
         }
     ));
@@ -4287,7 +4299,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     // --- STATEMENTS ---
 
-    statement_rule.set(MapV(
+    statement_rule.set(Map(MapV(
         OneOf4(
             item,
             let_statement,
@@ -4303,7 +4315,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                 Child4(item) => RStatement::Macro(item),
             }
         }
-    ));
+    ), |r| { println!("Statement: {:?}", r); r}));
 
     let_statement_rule.set(MapV(Spanned((
             ZeroOrMore((outer_attribute, w)), "let", w, pattern_no_top_alt, w,
@@ -4322,12 +4334,12 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     expression_statement_rule.set(MapV(
         OneOf2(
-            (expression_without_block, w, ';'),
-            (expression_with_block, Maybe((w, ';')))
+            Map((expression_without_block, w, ';'), |res| { println!("Expr No Block {:?}", res); res }),
+            Map((expression_with_block, Maybe((w, ';'))), |res| { println!("Expr With Block {:?}", res); res }),
         ),
-        |two| {
+        |choice| {
             use AnyOf2::*;
-            match two {
+            match choice {
                 Child1((expr, _, _)) => expr,
                 Child2((expr, _)) => expr,
             }
@@ -4336,30 +4348,22 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     // --- EXPRESSIONS ---
 
-    //srule!(expr, expr_rule);
-    //srule!(block_expr, block_expr_rule);
-    //srule!(mul_or_div, mul_or_div_rule);
-    //srule!(add_or_sub, add_or_sub_rule);
-    //srule!(negate, negate_rule);
-    //expr_rule.set();
-
-    expression_rule.set(Funnel2(
+    expression_rule.set(LRec(Map(Funnel2(
         expression_without_block,
         expression_with_block,
-    ));
+    ), |r| { println!("Expr: {:?}", r); r})));
 
-    expression_without_block_rule.set(MapV(Map((
+    expression_without_block_rule.set(LRec(MapV((
             ZeroOrMore((outer_attribute, w)),
-            Funnel9(
+            Funnel21(
+                Map(MapV(operator_expression,       |v| RExpr::Op(Box::new(v))), |r| { println!("Op Expr: {:?}", r); r}),
+                MapV(index_expression,          |v| RExpr::Index(Box::new(v))),
                 MapV(grouped_expression,        |v| RExpr::Group(Box::new(v))),
-                MapV(operator_expression,       |v| RExpr::Op(Box::new(v))),
                 MapV(array_expression,          |v| RExpr::Array(Box::new(v))),
                 MapV(await_expression,          |v| RExpr::Await(Box::new(v))),
                 MapV(tuple_expression,          |v| RExpr::Tuple(Box::new(v))),
                 MapV(tuple_indexing_expression, |v| RExpr::TupleIndexing(Box::new(v))),
-                MapV(index_expression,          |v| RExpr::Index(Box::new(v))),
                 MapV(struct_expression,         |v| RExpr::Struct(Box::new(v))),
-                Funnel9(
                 MapV(call_expression,           |v| RExpr::Call(Box::new(v))),
                 MapV(method_call_expression,    |v| RExpr::MethodCall(Box::new(v))),
                 MapV(field_expression,          |v| RExpr::Field(Box::new(v))),
@@ -4368,18 +4372,17 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                 MapV(continue_expression,       |v| RExpr::Continue(Box::new(v))),
                 MapV(break_expression,          |v| RExpr::Break(Box::new(v))),
                 MapV(return_expression,         |v| RExpr::Return(Box::new(v))),
-                Funnel5(
                 MapV(underscore_expression,     |v| RExpr::Underscore(Box::new(v))),
                 MapV(macro_invocation,          |v| RExpr::MacroInvocation(Box::new(v))),
                 MapV(path_expression,           |v| RExpr::Path(Box::new(v))),
                 MapV(range_expression,          |v| RExpr::Range(Box::new(v))),
                 MapV(literal_expression,        |v| RExpr::Lit(Box::new(v))),
-            )))
-        ), |res| { println!("\nExpr No Block: {:?}", res); res }),
+            )
+        ),
         |(_, expr)| { expr }
-    ));
+    )));
 
-    expression_with_block_rule.set(MapV((
+    expression_with_block_rule.set(LRec(MapV((
             ZeroOrMore((outer_attribute, w)),
             Funnel6(
                 MapV(block_expression,        |v| RExpr::Block(Box::new(v))),
@@ -4391,12 +4394,12 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
             )
         ),
         |(_, six)| { six }
-    ));
+    )));
 
     // - LITERAL EXPRESSION -
 
     literal_expression_rule.set(MapV(
-        Map(OneOf9(
+        Map(OneOf10(
             char_literal,
             string_literal,
             raw_string_literal,
@@ -4405,13 +4408,11 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
             raw_byte_string_literal,
             integer_literal,
             float_literal,
-            OneOf2(
-                "true",
-                "false"
-            )
-        ), |res| { println!("\nInt Lit Expr: {:?}", res); res }),
+            "true",
+            "false"
+        ), |res| { println!("\nLit Expr: {:?}", res); res }),
         |any| {
-            use AnyOf9::*;
+            use AnyOf10::*;
             match any {
                 Child1(v) => RLit::Char(v),
                 Child2(v) => RLit::String(v),
@@ -4419,10 +4420,10 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
                 Child4(v) => RLit::Byte(v),
                 Child5(v) => RLit::ByteString(v),
                 Child6(v) => RLit::RawByteString(v),
-                Child7(int) => RLit::Integer(int),
+                Child7(int)   => RLit::Integer(int),
                 Child8(float) => RLit::Float(float),
-                Child9(AnyOf2::Child1(span)) => RLit::Bool(RBoolLit::True  { span }),
-                Child9(AnyOf2::Child2(span)) => RLit::Bool(RBoolLit::False { span }),
+                Child9(span)  => RLit::Bool(RBoolLit::True  { span }),
+                Child10(span) => RLit::Bool(RBoolLit::False { span }),
             }
         }
     ));
@@ -4443,7 +4444,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     // - BLOCK_EXPRESSIONS -
 
-    block_expression_rule.set(MapV(Spanned(Surround(
+    block_expression_rule.set(Map(MapV(Spanned(Surround(
             '{',
             ( 
                 w,
@@ -4459,7 +4460,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         |(span, (_, (_, _, _, statements, _), _))| {
             RBlockExpr { span, statements: statements.unwrap_or_else(|| Vec::new()) }
         }
-    ));
+    ), |r| { println!("Block Expr: {:?}", r); r}));
 
     statements_rule.set(MapV(
         (Join(statement, w), Maybe((w, expression_without_block))),
@@ -4483,8 +4484,8 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     // - Operator Expressions -
 
-    operator_expression_rule.set(MapV(
-        OneOf9(
+    operator_expression_rule.set(
+        Funnel10(
             borrow_expression,
             deref_expression,
             error_propogation_expression,
@@ -4493,27 +4494,10 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
             comparison_expression,
             lazy_boolean_expression,
             type_cast_expression,
-            OneOf2(
-                assignment_expression,
-                compound_assignment_expression
-            )
+            assignment_expression,
+            compound_assignment_expression
         ),
-        |nine| {
-            use AnyOf9::*;
-            match nine {
-                Child1(e) => e,
-                Child2(e) => e,
-                Child3(e) => e,
-                Child4(e) => e,
-                Child5(e) => e,
-                Child6(e) => e,
-                Child7(e) => e,
-                Child8(e) => e,
-                Child9(AnyOf2::Child1(e)) => e,
-                Child9(AnyOf2::Child2(e)) => e,
-            }
-        }
-    ));
+    );
 
     borrow_expression_rule.set(MapV(
         Spanned(('&', Maybe('&'), Maybe((w, "mut")), w, expression)),
@@ -4550,37 +4534,20 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         }
     ));
 
-    arithmetic_or_logical_expression_rule.set(MapV(
-        Spanned(OneOf9(
-            (expression, w, '+', w, expression),
-            (expression, w, '-', w, expression),
-            (expression, w, '*', w, expression),
-            (expression, w, '/', w, expression),
-            (expression, w, '%', w, expression),
-            (expression, w, '&', w, expression),
-            (expression, w, '|', w, expression),
-            (expression, w, '^', w, expression),
-            OneOf2(
-                (expression, w, "<<", w, expression),
-                (expression, w, ">>", w, expression),
-            ),
-        )),
-        |(span, nine)| {
-            use AnyOf9::*;
-            match nine {
-                Child1((left, _, _, _, right)) => ROpExpr::Add { span, left, right },
-                Child2((left, _, _, _, right)) => ROpExpr::Sub { span, left, right },
-                Child3((left, _, _, _, right)) => ROpExpr::Mul { span, left, right },
-                Child4((left, _, _, _, right)) => ROpExpr::Div { span, left, right },
-                Child5((left, _, _, _, right)) => ROpExpr::Mod { span, left, right },
-                Child6((left, _, _, _, right)) => ROpExpr::BitAnd { span, left, right },
-                Child7((left, _, _, _, right)) => ROpExpr::BitOr { span, left, right },
-                Child8((left, _, _, _, right)) => ROpExpr::BitXOr { span, left, right },
-                Child9(AnyOf2::Child1((left, _, _, _, right))) => ROpExpr::LShift { span, left, right },
-                Child9(AnyOf2::Child2((left, _, _, _, right))) => ROpExpr::RShift { span, left, right },
-            }
-        }
-    ));
+    arithmetic_or_logical_expression_rule.set(
+        Funnel10(
+            MapV(Spanned((expression, w, '*' , w, expression)), |(span, (left, _, _, _, right))| ROpExpr::Mul    { span, left, right }),
+            MapV(Spanned((expression, w, '/' , w, expression)), |(span, (left, _, _, _, right))| ROpExpr::Div    { span, left, right }),
+            MapV(Spanned((expression, w, '%' , w, expression)), |(span, (left, _, _, _, right))| ROpExpr::Mod    { span, left, right }),
+            MapV(Spanned((expression, w, '&' , w, expression)), |(span, (left, _, _, _, right))| ROpExpr::BitAnd { span, left, right }),
+            MapV(Spanned((expression, w, '|' , w, expression)), |(span, (left, _, _, _, right))| ROpExpr::BitOr  { span, left, right }),
+            MapV(Spanned((expression, w, '^' , w, expression)), |(span, (left, _, _, _, right))| ROpExpr::BitXOr { span, left, right }),
+            MapV(Spanned((expression, w, "<<", w, expression)), |(span, (left, _, _, _, right))| ROpExpr::LShift { span, left, right }),
+            MapV(Spanned((expression, w, ">>", w, expression)), |(span, (left, _, _, _, right))| ROpExpr::RShift { span, left, right }),
+            Map(MapV(Spanned((expression, w, '+' , w, expression)), |(span, (left, _, _, _, right))| ROpExpr::Add    { span, left, right }), |r| { println!("Add: {:?}", r); r}),
+            MapV(Spanned((expression, w, '-' , w, expression)), |(span, (left, _, _, _, right))| ROpExpr::Sub   { span, left, right }),
+        )
+    );
 
     comparison_expression_rule.set(MapV(
         Spanned(OneOf6(
@@ -4629,7 +4596,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     compound_assignment_expression_rule.set(MapV(
-        Spanned(OneOf9(
+        Spanned(OneOf10(
             (expression, w, "+=", w, expression),
             (expression, w, "-=", w, expression),
             (expression, w, "*=", w, expression),
@@ -4638,24 +4605,22 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
             (expression, w, "&=", w, expression),
             (expression, w, "|=", w, expression),
             (expression, w, "^=", w, expression),
-            OneOf2(
-                (expression, w, "<<=", w, expression),
-                (expression, w, ">>=", w, expression),
-            ),
+            (expression, w, "<<=", w, expression),
+            (expression, w, ">>=", w, expression),
         )),
-        |(span, nine)| {
-            use AnyOf9::*;
-            match nine {
-                Child1((left, _, _, _, right)) => ROpExpr::AddAssign { span, left, right },
-                Child2((left, _, _, _, right)) => ROpExpr::SubAssign { span, left, right },
-                Child3((left, _, _, _, right)) => ROpExpr::MulAssign { span, left, right },
-                Child4((left, _, _, _, right)) => ROpExpr::DivAssign { span, left, right },
-                Child5((left, _, _, _, right)) => ROpExpr::ModAssign { span, left, right },
-                Child6((left, _, _, _, right)) => ROpExpr::BitAndAssign { span, left, right },
-                Child7((left, _, _, _, right)) => ROpExpr::BitOrAssign { span, left, right },
-                Child8((left, _, _, _, right)) => ROpExpr::BitXOrAssign { span, left, right },
-                Child9(AnyOf2::Child1((left, _, _, _, right))) => ROpExpr::LShiftAssign { span, left, right },
-                Child9(AnyOf2::Child2((left, _, _, _, right))) => ROpExpr::RShiftAssign { span, left, right },
+        |(span, choice)| {
+            use AnyOf10::*;
+            match choice {
+                Child1 ((left, _, _, _, right)) => ROpExpr::AddAssign { span, left, right },
+                Child2 ((left, _, _, _, right)) => ROpExpr::SubAssign { span, left, right },
+                Child3 ((left, _, _, _, right)) => ROpExpr::MulAssign { span, left, right },
+                Child4 ((left, _, _, _, right)) => ROpExpr::DivAssign { span, left, right },
+                Child5 ((left, _, _, _, right)) => ROpExpr::ModAssign { span, left, right },
+                Child6 ((left, _, _, _, right)) => ROpExpr::BitAndAssign { span, left, right },
+                Child7 ((left, _, _, _, right)) => ROpExpr::BitOrAssign  { span, left, right },
+                Child8 ((left, _, _, _, right)) => ROpExpr::BitXOrAssign { span, left, right },
+                Child9 ((left, _, _, _, right)) => ROpExpr::LShiftAssign { span, left, right },
+                Child10((left, _, _, _, right)) => ROpExpr::RShiftAssign { span, left, right },
             }
         }
     ));
@@ -4809,7 +4774,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         }
     ));
 
-    // CLOSURE EXPRESSIONS
+    // - CLOSURE EXPRESSION -
 
     closure_expression_rule.set(MapV(Spanned((
             Maybe("move"),
@@ -4917,27 +4882,16 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 
     // - RANGE EXPRESSIONS -
 
-    range_expression_rule.set(MapV(
-        OneOf6(
+    range_expression_rule.set(
+        Funnel6(
             range_expr,
             range_from_expr,
             range_to_expr,
             range_full_expr,
             range_inclusive_expr,
             range_to_inclusive_expr
-        ),
-        |six| {
-            use AnyOf6::*;
-            match six {
-                Child1(r) => r,
-                Child2(r) => r,
-                Child3(r) => r,
-                Child4(r) => r,
-                Child5(r) => r,
-                Child6(r) => r,
-            }
-        }
-    ));
+        )
+    );
 
     range_expr_rule.set(MapV(
         Spanned((expression, w, "..", w, expression)),
@@ -5527,7 +5481,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         }
     ));
 
-    _crate.parse(&file, PPos::new())
+    _crate.parse(&AnyMemTable::new(file), PPos::new())
 }
 
 

@@ -1,21 +1,21 @@
-use super::super::{ParseStore, ParsePos, ParseNode, ParseResult, UnexpectedValueError, UnexpectedEndError, Span};
+use super::super::{ParseStore, ParsePos, ParseNode, ParseResult, UnexpectedValueError, UnexpectedEndError, Span, ParseContext};
 
 use ParseResult::*;
 
 macro_rules! value {
     ($t: ident) => {
-        impl <Err: From<UnexpectedValueError<Pos, $t>> + From<UnexpectedEndError<Pos>>, Store: ParseStore<Pos, $t>, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, $t> for $t {
-            fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
-                let mut curr_pos = pos.clone();
-                match store.value_at(&mut curr_pos) {
+        impl <Err: From<UnexpectedValueError<Pos, $t>> + From<UnexpectedEndError<Pos>>, Store: ParseStore<Pos, $t> + ?Sized, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, $t> for $t {
+            fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, $t>) -> ParseResult<Span<Pos>, Err, Pos> {
+                let mut curr_pos = cxt.pos.clone();
+                match cxt.store.value_at(&mut curr_pos) {
                     Some(value) => {
                         if value == *self {
-                            Okay(Span::new(pos, curr_pos.clone()), curr_pos)
+                            Okay(Span::new(cxt.pos, curr_pos.clone()), curr_pos)
                         } else {
-                            Error(UnexpectedValueError { pos, found: value, expected: *self }.into())
+                            Error(UnexpectedValueError { pos: cxt.pos, found: value, expected: *self }.into())
                         }
                     },
-                    None => Error(UnexpectedEndError { pos }.into()),
+                    None => Error(UnexpectedEndError { pos: cxt.pos }.into()),
                 }
             }
         }
