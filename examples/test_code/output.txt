@@ -1,0 +1,137 @@
+CROSSHAIR
+-----------------------------------------------------------------------------------------------------------------------
+
+←[91mI was able to make your postcondition return False.←[0m
+C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:4:
+|
+|def s_algebra(x: int, y: int) -> int:
+|  '''
+>←[93m  post: __return__ != y
+←[0m|  '''
+|  x = y + 4
+|  y = 2*x;
+
+false
+when calling s_algebra(0, -5) (which returns -5)
+-----------------------------------------------------------------------------------------------------------------------
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\core.py", line 1435, in attempt_call
+    __return__ = unenforced_fn(*bargs, **bkwargs)
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\condition_parser.py", line 103, in __call__
+    return self.fn(*a, **kw)
+  File "C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py", line 17, in b_algebra
+    return x / y
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\libimpl\builtinslib.py", line 288, in __truediv__
+    return numeric_binop(ops.truediv, self, other)
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\libimpl\builtinslib.py", line 447, in numeric_binop
+    return numeric_binop_internal(op, a, b)
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\libimpl\builtinslib.py", line 467, in numeric_binop_internal
+    return binfn(op, a, b)
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\libimpl\builtinslib.py", line 498, in promotion_backward
+    return numeric_binop(o, x2, y2)
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\libimpl\builtinslib.py", line 447, in numeric_binop
+    return numeric_binop_internal(op, a, b)
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\libimpl\builtinslib.py", line 467, in numeric_binop_internal
+    return binfn(op, a, b)
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\libimpl\builtinslib.py", line 494, in promotion_forward
+    return numeric_binop(o, x2, y2)
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\libimpl\builtinslib.py", line 447, in numeric_binop
+    return numeric_binop_internal(op, a, b)
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\libimpl\builtinslib.py", line 467, in numeric_binop_internal
+    return binfn(op, a, b)
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\libimpl\builtinslib.py", line 640, in _
+    return SymbolicFloat(apply_smt(op, a.var, b.var))
+  File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\libimpl\builtinslib.py", line 564, in apply_smt
+    raise ZeroDivisionError("division by zero")
+
+←[91mI found an exception while running your function.←[0m
+C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:17:
+|  '''
+|  x = y + 4
+|  y = 2*x
+>←[93m  return x / y
+←[0m|
+|def b_ifStmt(x:int, y:int) -> int:
+|  '''
+
+ZeroDivisionError: division by zero
+when calling b_algebra(0, -4)
+-----------------------------------------------------------------------------------------------------------------------
+
+←[91mI was able to make your postcondition return False.←[0m
+C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:34:
+|
+|def s_ifStmt(x:int, y:int) -> int:
+|  '''
+>←[93m  post: __return__ != 0
+←[0m|  '''
+|  y = 2
+|  if x < 4:
+
+false
+when calling s_ifStmt(4, 0) (which returns 0)
+-----------------------------------------------------------------------------------------------------------------------
+
+←[91mI was able to make your postcondition return False.←[0m
+C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:47:
+|
+|def b2_ifStmt(x:int, y:int) -> int:
+|  '''
+>←[93m  post: y != x + 1
+←[0m|  '''
+|  y = 1
+|  if x < 5:
+
+false
+when calling b2_ifStmt(0, 1) (which returns 0)
+-----------------------------------------------------------------------------------------------------------------------
+
+←[91mI was able to make your postcondition return False.←[0m
+C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:58:
+|
+|def s2_ifStmt(x:int, y:int) -> int:
+|  """
+>←[93m  post: __return__ != 10
+←[0m|  """
+|  if x < 5:
+|    if x > 5:
+
+false
+when calling s2_ifStmt(0, 5) (which returns 10)
+-----------------------------------------------------------------------------------------------------------------------
+
+←[91mI was able to make your postcondition return False.←[0m
+C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:81:
+|def b_loop(n:int) -> int:
+|  '''
+|  pre: n > 0
+>←[93m  post: __return__  == n
+←[0m|  '''
+|  i = 0
+|  j = 1
+
+false
+when calling b_loop(2) (which returns 3)
+-----------------------------------------------------------------------------------------------------------------------
+
+←[91mI was able to make your postcondition return False.←[0m
+C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:92:
+|
+|def b_infLoop(n:int) -> int:
+|  '''
+>←[93m  post: __return__  == n
+←[0m|  '''
+|  i = 0
+|  j = 1
+
+false
+when calling b_infLoop(-1) (which returns 0)
+
+
+HAYBALE
+Inputs for which s_algebra returns 0: [I32(0), I32(2147483644)]
+Inputs for which b_algebra returns 0: [I32(0), I32(-1073741828)]
+b_ifStmt can never return 0
+Inputs for which s_ifStmt returns 0: [I32(4), I32(0)]
+Inputs for which s_loop returns 0: [I32(-2147483639)]
+Inputs for which b_loop returns 0: [I32(-2147483640)]
+Inputs for which b2_loop returns 0: [I32(-1073741824)]
