@@ -1,3 +1,6 @@
+mod mem;
+pub use mem::*;
+
 mod funnel;
 pub use funnel::*;
 

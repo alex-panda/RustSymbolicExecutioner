@@ -4356,7 +4356,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     expression_without_block_rule.set(LRec(MapV((
             ZeroOrMore((outer_attribute, w)),
             Funnel21(
-                Map(MapV(operator_expression,       |v| RExpr::Op(Box::new(v))), |r| { println!("Op Expr: {:?}", r); r}),
+                Map(MapV(operator_expression,   |v| RExpr::Op(Box::new(v))), |r| { println!("Op Expr: {:?}", r); r}),
                 MapV(index_expression,          |v| RExpr::Index(Box::new(v))),
                 MapV(grouped_expression,        |v| RExpr::Group(Box::new(v))),
                 MapV(array_expression,          |v| RExpr::Array(Box::new(v))),
@@ -4483,7 +4483,6 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     // - Operator Expressions -
-
     operator_expression_rule.set(
         Funnel10(
             borrow_expression,
@@ -5481,7 +5480,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
         }
     ));
 
-    _crate.parse(&AnyMemTable::new(file), PPos::new())
+    _crate.parse(&TLRecMemTable::new(file), PPos::new())
 }
 
 
