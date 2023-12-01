@@ -355,7 +355,7 @@ pub struct LRecNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok: Clone, Err: Cl
 use ParseResult::*;
 use zst::ZST;
 impl <Ok: Clone + 'static, Err: Clone + From<LRecError<Pos>> + 'static, Store: ParseStore<Pos, V> + LRecMemTable<Pos> + ?Sized, Pos: ParsePos<Key = K>, V: ParseValue, K: Clone + Hash + Eq + Ord, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Ok, Err, Store, Pos, V> for LRecNode<Child, Ok, Err, Store, Pos, V, K> {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
         // Get the unique ID of this `LRec` node.
         let nterm = ((&self.byte) as *const _) as usize;
 
@@ -376,7 +376,7 @@ impl <Ok: Clone + 'static, Err: Clone + From<LRecError<Pos>> + 'static, Store: P
             loop {
                 head.set_evaluation_set(head.involved_set());
 
-                match self.child.do_parse(cxt.clone()) {
+                match self.child.parse(cxt.clone()) {
                     Okay(ok, pos) => {
                         if pos.key() <= entry.pos().key() {
                             break;
@@ -512,7 +512,7 @@ impl <Ok: Clone + 'static, Err: Clone + From<LRecError<Pos>> + 'static, Store: P
                 head.evaluation_set_remove(nterm);
 
                 // evaluate the node and return its result
-                Ok(match self.child.do_parse(cxt.with_pos(pos.clone())) {
+                Ok(match self.child.parse(cxt.with_pos(pos.clone())) {
                     Okay(ok, pos) => Some(R::new(Entry { res: EntryVal::Okay(Rc::new(ok)), pos })),
                     Error(err) => Some(R::new(Entry { res: EntryVal::Error(Rc::new(err)), pos })),
                     Panic(err) => return Err(err),
@@ -547,7 +547,7 @@ impl <Ok: Clone + 'static, Err: Clone + From<LRecError<Pos>> + 'static, Store: P
             table.lr_mem_set(key, entry.clone());
 
             // parse child node
-            let res = self.child.do_parse(cxt.clone());
+            let res = self.child.parse(cxt.clone());
 
             // pop the `LR`
             table.lr_stack_pop();

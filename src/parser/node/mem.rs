@@ -126,7 +126,7 @@ pub struct MemNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok: Clone, Err: Clo
 use ParseResult::*;
 use zst::ZST;
 impl <Ok: Clone, Err: Clone, Store: ParseStore<Pos, V> + MemTable<Ok, Err, Pos> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Ok, Err, Store, Pos, V> for MemNode<Child, Ok, Err, Store, Pos, V> {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
         // The key is the node's unique ID (i.e. the location in memory of the
         // `Mem` node) and the key of the parse position.
         let key = (((&self.byte) as *const _) as usize, cxt.pos.key());
@@ -141,7 +141,7 @@ impl <Ok: Clone, Err: Clone, Store: ParseStore<Pos, V> + MemTable<Ok, Err, Pos> 
 
         // No previous result produced by child node at this position was
         // memoized so parse the child node now and then save and return its result.
-        let child_res = self.child.do_parse(cxt.clone());
+        let child_res = self.child.parse(cxt.clone());
 
         // return the result of parsing at this position
         match cxt.store.mem_set(key, child_res.clone()) {

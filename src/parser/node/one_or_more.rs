@@ -16,23 +16,24 @@ pub struct OneOrMoreNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Stor
 use ParseResult::*;
 
 impl <Ok, Err: From<NoAdvanceError<Pos>> + From<FailedFirstParseError<Pos, Err>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Vec<Ok>, Err, Store, Pos, V> for OneOrMoreNode<Child, Ok, Err, Store, Pos, V> {
-    fn do_parse<'a>(&self, mut cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Vec<Ok>, Err, Pos> {
+    fn parse<'a>(&self, mut cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Vec<Ok>, Err, Pos> {
+        let start_pos = cxt.pos.clone();
         let mut accume: Vec<Ok> = Vec::new();
 
         // try the first parse
-        match self.child.do_parse(cxt.clone()) {
+        match self.child.parse(cxt.clone()) {
             Okay(okay, advance) => {
-                if advance.key() == cxt.pos.key() { return Panic(NoAdvanceError { pos: cxt.pos }.into()); }
+                if advance.key() == cxt.pos.key() { return Panic(NoAdvanceError { pos: start_pos }.into()); }
                 accume.push(okay);
                 cxt.pos = advance;
             },
-            Error(cause) => return Error(FailedFirstParseError { pos: cxt.pos, cause }.into()),
+            Error(cause) => return Error(FailedFirstParseError { pos: start_pos, cause }.into()),
             Panic(err) => return Panic(err),
         }
 
         // try all subsequent parses
         loop {
-            match self.child.do_parse(cxt.clone()) {
+            match self.child.parse(cxt.clone()) {
                 Okay(okay, advance) => {
                     if advance.key() == cxt.pos.key() { return Panic(NoAdvanceError { pos: cxt.pos }.into()); }
                     accume.push(okay);
@@ -44,27 +45,27 @@ impl <Ok, Err: From<NoAdvanceError<Pos>> + From<FailedFirstParseError<Pos, Err>>
         }
     }
 
-    fn do_parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
-        let mut curr_pos = cxt.pos.clone();
+    fn parse_span<'a>(&self, mut cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
+        let start_pos = cxt.pos.clone();
 
         // try first parse
-        match self.child.do_parse_span(cxt.clone()) {
+        match self.child.parse_span(cxt.clone()) {
             Okay(_, advance) => {
-                if advance.key() == cxt.pos.key() { return Panic(NoAdvanceError { pos: cxt.pos.clone() }.into()); }
-                curr_pos = advance
+                if advance.key() == cxt.pos.key() { return Panic(NoAdvanceError { pos: start_pos }.into()); }
+                cxt.pos = advance
             },
-            Error(cause) => return Error(FailedFirstParseError { pos: cxt.pos, cause }.into()),
+            Error(cause) => return Error(FailedFirstParseError { pos: start_pos, cause }.into()),
             Panic(error) => return Panic(error),
         }
 
         // try all subsequent parses
         loop {
-            match self.child.do_parse_span(cxt.clone()) {
+            match self.child.parse_span(cxt.clone()) {
                 Okay(_, advance) => {
                     if advance.key() == cxt.pos.key() { return Panic(NoAdvanceError { pos: cxt.pos }.into()); }
-                    curr_pos = advance
+                    cxt.pos = advance;
                 },
-                Error(_) => return Okay(Span::new(cxt.pos, curr_pos.clone()), curr_pos),
+                Error(_) => return Okay(Span::new(start_pos, cxt.pos.clone()), cxt.pos.clone()),
                 Panic(error) => return Panic(error),
             }
         }

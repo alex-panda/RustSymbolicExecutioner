@@ -25,11 +25,11 @@ pub struct LeaderNode<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseN
 }
 
 impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, F: Fn(&Store, Ok1, Err) -> Err, Ok1, Ok2, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<(Ok1, Ok2), Err, Store, Pos, V> for LeaderNode<Child1, Child2, F, Ok1, Ok2, Err, Store, Pos, V> {
-    fn do_parse<'a>(&self, mut cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<(Ok1, Ok2), Err, Pos> {
+    fn parse<'a>(&self, mut cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<(Ok1, Ok2), Err, Pos> {
         use ParseResult::*;
 
         // try to parse child 1
-        let ok1 = match self.child1.do_parse(cxt.clone()) {
+        let ok1 = match self.child1.parse(cxt.clone()) {
             Okay(v, advance) => {
                 cxt.pos = advance;
                 v
@@ -39,7 +39,7 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
         };
 
         // child1 parsed so we expect child2 to also parse
-        let ok2 = match self.child2.do_parse(cxt.clone()) {
+        let ok2 = match self.child2.parse(cxt.clone()) {
             Okay(v, advance) => {
                 cxt.pos = advance;
                 v

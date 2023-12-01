@@ -5,7 +5,7 @@ use ParseResult::*;
 macro_rules! value {
     ($t: ident) => {
         impl <Err: From<UnexpectedValueError<Pos, $t>> + From<UnexpectedEndError<Pos>>, Store: ParseStore<Pos, $t> + ?Sized, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, $t> for $t {
-            fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, $t>) -> ParseResult<Span<Pos>, Err, Pos> {
+            fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, $t>) -> ParseResult<Span<Pos>, Err, Pos> {
                 let mut curr_pos = cxt.pos.clone();
                 match cxt.store.value_at(&mut curr_pos) {
                     Some(value) => {

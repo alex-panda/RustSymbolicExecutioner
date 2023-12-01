@@ -21,16 +21,16 @@ pub struct NotNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: From<Unexp
 
 use ParseResult::*;
 impl <Ok, Err: From<UnexpectedSuccessError<Pos>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<(), Err, Store, Pos, V> for NotNode<Child, Ok, Err, Store, Pos, V> {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<(), Err, Pos> {
-        match self.child.do_parse_span(cxt.clone()) {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<(), Err, Pos> {
+        match self.child.parse_span(cxt.clone()) {
             Okay(_, _) => Error(UnexpectedSuccessError { pos: cxt.pos }.into()),
             Error(_) => Okay((), cxt.pos),
             Panic(err) => Panic(err),
         }
     }
 
-    fn do_parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<crate::parser::Span<Pos>, Err, Pos> {
-        match self.child.do_parse_span(cxt.clone()) {
+    fn parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<crate::parser::Span<Pos>, Err, Pos> {
+        match self.child.parse_span(cxt.clone()) {
             Okay(_, _) => Error(UnexpectedSuccessError { pos: cxt.pos }.into()),
             Error(_) => Okay(Span::new(cxt.pos.clone(), cxt.pos.clone()), cxt.pos),
             Panic(err) => Panic(err),

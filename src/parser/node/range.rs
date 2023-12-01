@@ -7,7 +7,7 @@ use ParseResult::*;
 macro_rules! impl_range {
     ($rangeboundtype: ty, $t: ty) => {
         impl <Err: From<UnexpectedEndError<Pos>> + From<ValueOutsideRangeError<Pos, $t>>, Store: ParseStore<Pos, $t> + ?Sized, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, $t> for $rangeboundtype {
-            fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, $t>) -> ParseResult<Span<Pos>, Err, Pos> {
+            fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, $t>) -> ParseResult<Span<Pos>, Err, Pos> {
                 let mut curr_pos = cxt.pos.clone();
 
                 match cxt.store.value_at(&mut curr_pos) {
@@ -136,7 +136,7 @@ impl_range!(RangeToInclusive<f64>, f64);
 macro_rules! impl_u32_range_for_char {
     ($rangeboundtype: ty) => {
         impl <Err: From<UnexpectedEndError<Pos>> + From<ValueOutsideRangeError<Pos, u32>>, Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, char> for $rangeboundtype {
-            fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, char>) -> ParseResult<Span<Pos>, Err, Pos> {
+            fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, char>) -> ParseResult<Span<Pos>, Err, Pos> {
                 let mut curr_pos = cxt.pos.clone();
 
                 match cxt.store.value_at(&mut curr_pos) {

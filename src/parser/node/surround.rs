@@ -40,9 +40,9 @@ pub struct SurroundNode<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: Pars
 }
 
 impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, Child3: ParseNode<Ok3, Err, Store, Pos, V>, MiddleFail: Fn(&Store, Ok1, Err) -> Err, EndFail: Fn(&Store, Ok1, Ok2, Err) -> Err, Ok1, Ok2, Ok3, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<(Ok1, Ok2, Ok3), Err, Store, Pos, V> for SurroundNode<Child1, Child2, Child3, MiddleFail, EndFail, Ok1, Ok2, Ok3, Err, Store, Pos, V> {
-    fn do_parse<'a>(&self, mut cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<(Ok1, Ok2, Ok3), Err, Pos> {
+    fn parse<'a>(&self, mut cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<(Ok1, Ok2, Ok3), Err, Pos> {
         use ParseResult::*;
-        let ok1 = match self.child1.do_parse(cxt.clone()) {
+        let ok1 = match self.child1.parse(cxt.clone()) {
             Okay(v, advance) => {
                 cxt.pos = advance;
                 v
@@ -51,7 +51,7 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
             Panic(error) => return Panic(error),
         };
 
-        let ok2 = match self.child2.do_parse(cxt.clone()) {
+        let ok2 = match self.child2.parse(cxt.clone()) {
             Okay(v, advance) => {
                 cxt.pos = advance;
                 v
@@ -60,7 +60,7 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
             Panic(error) => return Panic(error),
         };
 
-        let ok3 = match self.child3.do_parse(cxt.clone()) {
+        let ok3 = match self.child3.parse(cxt.clone()) {
             Okay(v, advance) => {
                 cxt.pos = advance;
                 v

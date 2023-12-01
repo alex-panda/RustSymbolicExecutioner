@@ -14,16 +14,16 @@ pub struct IsNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: Pars
 
 use ParseResult::*;
 impl <Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Ok, Err, Store, Pos, V> for IsNode<Child, Ok, Err, Store, Pos, V> {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
-        match self.child.do_parse(cxt.clone()) {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
+        match self.child.parse(cxt.clone()) {
             Okay(value, _) => Okay(value, cxt.pos),
             Error(error) => Error(error),
             Panic(error) => Panic(error),
         }
     }
     
-    fn do_parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
-        match self.child.do_parse_span(cxt.clone()) {
+    fn parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
+        match self.child.parse_span(cxt.clone()) {
             Okay(_, advance) => Okay(Span::new(cxt.pos.clone(), advance), cxt.pos),
             Error(error) => Error(error),
             Panic(error) => Panic(error),

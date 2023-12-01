@@ -19,7 +19,7 @@ pub struct MapPValueNode<F: Fn(Span<Pos>, V) -> ParseResult<Ok, Err, Pos>, Ok, E
 }
 
 impl <F: Fn(Span<Pos>, V) -> ParseResult<Ok, Err, Pos>, Ok, Err: From<UnexpectedEndError<Pos>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<Ok, Err, Store, Pos, V> for MapPValueNode<F, Ok, Err, Store, Pos, V> {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
         let mut curr_pos = cxt.pos.clone();
         let v = cxt.store.value_at(&mut curr_pos);
         match v {

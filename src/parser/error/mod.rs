@@ -1,3 +1,6 @@
+mod never_error;
+pub use never_error::*;
+
 mod lrec_error;
 pub use lrec_error::*;
 

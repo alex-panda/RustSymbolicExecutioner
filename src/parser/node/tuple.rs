@@ -6,7 +6,7 @@ use ParseResult::*;
 
 // impl parse node for empty tuple
 impl <Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<(), Err, Store, Pos, V> for () {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<(), Err, Pos> {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<(), Err, Pos> {
         Okay((), cxt.pos)
     }
 }
@@ -16,9 +16,9 @@ impl <Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> Par
 macro_rules! impl_tuple {
     ($($child_id: ident | $ok_id: ident | $num: tt),*) => {
         impl <$($ok_id),*, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, $($child_id: ParseNode<$ok_id, Err, Store, Pos, V>),*> ParseNode<($($ok_id),*,), Err, Store, Pos, V> for ($($child_id),*,) {
-            fn do_parse<'a>(&self, mut cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<($($ok_id),*,), Err, Pos> {
+            fn parse<'a>(&self, mut cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<($($ok_id),*,), Err, Pos> {
                 Okay((
-                    $(match self.$num.do_parse(cxt.clone()) {
+                    $(match self.$num.parse(cxt.clone()) {
                         ParseResult::Okay(v1, new_pos) => { cxt.pos = new_pos; v1 },
                         ParseResult::Error(err) => { return Error(err) },
                         ParseResult::Panic(err) => { return Panic(err) },
@@ -26,10 +26,10 @@ macro_rules! impl_tuple {
                 ), cxt.pos)
             }
 
-            fn do_parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
+            fn parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
                 let mut _curr_pos = cxt.pos.clone();
 
-                $(match self.$num.do_parse_span(cxt.clone()) {
+                $(match self.$num.parse_span(cxt.clone()) {
                     ParseResult::Okay(_, new_pos) => { _curr_pos = new_pos; },
                     ParseResult::Error(err) => { return Error(err) },
                     ParseResult::Panic(err) => { return Panic(err) },

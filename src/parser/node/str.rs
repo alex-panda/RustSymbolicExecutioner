@@ -4,7 +4,7 @@ use super::super::{ParseNode, ParsePos, ParseStore, ParseResult};
 
 use ParseResult::*;
 impl <Err: From<UnexpectedEndError<Pos>> + From<UnexpectedValueError<Pos, char>>, Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, char> for str {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, char>) -> ParseResult<Span<Pos>, Err, Pos> {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, char>) -> ParseResult<Span<Pos>, Err, Pos> {
         let mut curr_pos = cxt.pos.clone();
         for target_char in self.chars() {
             match cxt.store.value_at(&mut curr_pos) {
@@ -23,7 +23,7 @@ impl <Err: From<UnexpectedEndError<Pos>> + From<UnexpectedValueError<Pos, char>>
 
 
 impl <Err: From<UnexpectedEndError<Pos>> + From<UnexpectedValueError<Pos, char>>, Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, char> for String {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, char>) -> ParseResult<Span<Pos>, Err, Pos> {
-        ParseNode::do_parse(self.as_str(), cxt)
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, char>) -> ParseResult<Span<Pos>, Err, Pos> {
+        ParseNode::parse(self.as_str(), cxt)
     }
 }

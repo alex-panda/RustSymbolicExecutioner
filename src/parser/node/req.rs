@@ -25,9 +25,9 @@ pub struct ReqNode<Child: ParseNode<Ok, Err, Store, Pos, V>, F: Fn(&Store, Pos, 
 }
 
 impl <Child: ParseNode<Ok, Err, Store, Pos, V>, F: Fn(&Store, Pos, Err) -> Err, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<Ok, Err, Store, Pos, V> for ReqNode<Child, F, Ok, Err, Store, Pos, V> {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
         use ParseResult::*;
-        match self.child.do_parse(cxt.clone()) {
+        match self.child.parse(cxt.clone()) {
             Okay(value, advance) => Okay(value, advance),
             Error(err) => Panic((self.func)(cxt.store, cxt.pos, err)),
             Panic(err) => Panic(err),

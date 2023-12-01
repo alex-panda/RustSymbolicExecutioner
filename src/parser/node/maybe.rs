@@ -20,16 +20,16 @@ pub struct MaybeNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: P
 
 use ParseResult::*;
 impl <Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Option<Ok>, Err, Store, Pos, V> for MaybeNode<Child, Ok, Err, Store, Pos, V> {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Option<Ok>, Err, Pos> {
-        match self.child.do_parse(cxt.clone()) {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Option<Ok>, Err, Pos> {
+        match self.child.parse(cxt.clone()) {
             Okay(value, advance) => Okay(Some(value), advance),
             Error(_) => Okay(None, cxt.pos),
             Panic(error) => Panic(error),
         }
     }
 
-    fn do_parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
-        match self.child.do_parse_span(cxt.clone()) {
+    fn parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
+        match self.child.parse_span(cxt.clone()) {
             Okay(_, advance) => Okay(Span::new(cxt.pos, advance.clone()), advance),
             Error(_) => Okay(Span::new(cxt.pos.clone(), cxt.pos.clone()), cxt.pos),
             Panic(error) => Panic(error),

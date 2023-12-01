@@ -33,10 +33,10 @@ pub struct OneOfNode<Child, Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, 
 
 
 impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>, const N: usize> ParseNode<Ok, Err, Store, Pos, V> for OneOfNode<Child, Ok, Err, Store, Pos, V, N> {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
         let mut out = core::array::from_fn(|_| None);
         for (i, child) in self.children.iter().enumerate() {
-            match child.do_parse(cxt.clone()) {
+            match child.parse(cxt.clone()) {
                 Okay(value, advance) => return Okay(value, advance),
                 Error(error) => out[i] = Some(error),
                 Panic(error) => return Panic(error),
@@ -46,10 +46,10 @@ impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos,
         Error(AllChildrenFailedError { pos: cxt.pos, errors: out.map(|v| if let Some(v) = v { v } else { panic!("`OneOf` node expected either success or {} errors, but less errors than expected were given", N) }) }.into())
     }
 
-    fn do_parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
+    fn parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
         let mut out = core::array::from_fn(|_| None);
         for (i, child) in self.children.iter().enumerate() {
-            match child.do_parse_span(cxt.clone()) {
+            match child.parse_span(cxt.clone()) {
                 Okay(value, advance) => return Okay(value, advance),
                 Error(error) => out[i] = Some(error),
                 Panic(error) => return Panic(error),
@@ -84,9 +84,9 @@ macro_rules! impl_one_of {
         }
 
         impl <$($child_id: ParseNode<$ok_id, Err, Store, Pos, V>),*, $($ok_id),*, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<$any_of_id<$($ok_id),*>, Err, Store, Pos, V> for $node_id<$($child_id),*, $($ok_id),*, Err, Store, Pos, V> {
-            fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<$any_of_id<$($ok_id),*>, Err, Pos> {
+            fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<$any_of_id<$($ok_id),*>, Err, Pos> {
                 let errors = [$(
-                    match self.$lower_child_id.do_parse(cxt.clone()) {
+                    match self.$lower_child_id.parse(cxt.clone()) {
                         Okay(value, advance) => return Okay($any_of_id::$child_id(value), advance),
                         Error(error) => error,
                         Panic(error) => return Panic(error),
@@ -96,9 +96,9 @@ macro_rules! impl_one_of {
                 Error(Err::from(AllChildrenFailedError { pos: cxt.pos, errors }))
             }
 
-            fn do_parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
+            fn parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
                 let errors = [$(
-                    match self.$lower_child_id.do_parse_span(cxt.clone()) {
+                    match self.$lower_child_id.parse_span(cxt.clone()) {
                         Okay(_, advance) => return Okay(Span::new(cxt.pos, advance.clone()), advance),
                         Error(error) => error,
                         Panic(error) => return Panic(error),

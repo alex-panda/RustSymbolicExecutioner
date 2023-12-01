@@ -1,3 +1,12 @@
+mod never;
+pub use never::*;
+
+mod lr;
+pub use lr::*;
+
+mod boxed;
+pub use boxed::*;
+
 mod mem;
 pub use mem::*;
 
@@ -36,9 +45,6 @@ pub use stack_rule::*;
 
 mod option;
 pub use option::*;
-
-mod boxed;
-pub use boxed::*;
 
 mod weak;
 pub use weak::*;

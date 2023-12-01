@@ -1236,6 +1236,27 @@ pub struct RCharLit {
 }
 
 #[derive(Debug, Clone)]
+pub struct RByteStrLit {
+    pub span: Span<PPos>,
+    pub value: Span<PPos>,
+    pub suffix: Option<Span<PPos>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RRawByteStrLit {
+    pub span: Span<PPos>,
+    pub text: Span<PPos>,
+    pub suffix: Option<Span<PPos>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RByteLit {
+    pub span: Span<PPos>,
+    pub value: Span<PPos>,
+    pub suffix: Option<Span<PPos>>
+}
+
+#[derive(Debug, Clone)]
 pub struct RFloatLit {
     pub span: Span<PPos>,
     pub value: Span<PPos>,
@@ -1273,27 +1294,6 @@ pub struct ROctLit {
 pub struct RHexLit {
     pub span: Span<PPos>,
     pub value: Span<PPos>,
-}
-
-#[derive(Debug, Clone)]
-pub struct RByteStrLit {
-    pub span: Span<PPos>,
-    pub value: Span<PPos>,
-    pub suffix: Option<Span<PPos>>,
-}
-
-#[derive(Debug, Clone)]
-pub struct RRawByteStrLit {
-    pub span: Span<PPos>,
-    pub text: Span<PPos>,
-    pub suffix: Option<Span<PPos>>,
-}
-
-#[derive(Debug, Clone)]
-pub struct RByteLit {
-    pub span: Span<PPos>,
-    pub value: Span<PPos>,
-    pub suffix: Option<Span<PPos>>
 }
 
 #[derive(Debug, Clone)]
@@ -5487,6 +5487,7 @@ pub fn parse_file(file: &str) -> ParseResult<RCrate, String, PPos> {
 #[cfg(test)]
 mod test_new_parser {
     use super::parse_file;
+
 
     #[test]
     fn test_empty() {

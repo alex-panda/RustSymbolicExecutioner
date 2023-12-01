@@ -5,7 +5,7 @@ use super::super::{ParseStore, ParsePos, ParseNode, ParseResult, UnexpectedValue
 use ParseResult::*;
 
 impl <Err: From<UnexpectedValueError<Pos, u32>> + From<UnexpectedEndError<Pos>>, Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, char> for u32 {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, char>) -> ParseResult<Span<Pos>, Err, Pos> {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, char>) -> ParseResult<Span<Pos>, Err, Pos> {
         let mut curr_pos = cxt.pos.clone();
         match cxt.store.value_at(&mut curr_pos) {
             Some(char) => {

@@ -19,7 +19,7 @@ pub struct MapPNode<F: Fn(&Store, Pos) -> ParseResult<Ok, Err, Pos>, Ok, Err, St
 }
 
 impl <F: Fn(&Store, Pos) -> ParseResult<Ok, Err, Pos>, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<Ok, Err, Store, Pos, V> for MapPNode<F, Ok, Err, Store, Pos, V> {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
         (self.func)(cxt.store, cxt.pos)
     }
 }

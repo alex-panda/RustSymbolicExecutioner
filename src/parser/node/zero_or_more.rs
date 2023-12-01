@@ -19,11 +19,11 @@ pub struct ZeroOrMoreNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: Fro
 use ParseResult::*;
 
 impl <Ok, Err: From<NoAdvanceError<Pos>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Vec<Ok>, Err, Store, Pos, V> for ZeroOrMoreNode<Child, Ok, Err, Store, Pos, V> {
-    fn do_parse<'a>(&self, mut cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Vec<Ok>, Err, Pos> {
+    fn parse<'a>(&self, mut cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Vec<Ok>, Err, Pos> {
         let mut accume: Vec<Ok> = Vec::new();
 
         loop {
-            match self.child.do_parse(cxt.clone()) {
+            match self.child.parse(cxt.clone()) {
                 Okay(okay, advance) => {
                     if advance.key() == cxt.pos.key() { return Panic(NoAdvanceError { pos: cxt.pos }.into()); }
                     accume.push(okay);
@@ -35,10 +35,10 @@ impl <Ok, Err: From<NoAdvanceError<Pos>>, Store: ParseStore<Pos, V> + ?Sized, Po
         }
     }
 
-    fn do_parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
+    fn parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
         let mut curr_pos = cxt.pos.clone();
         loop {
-            match self.child.do_parse_span(cxt.with_pos(curr_pos.clone())) {
+            match self.child.parse_span(cxt.with_pos(curr_pos.clone())) {
                 Okay(_, advance) => {
                     if advance.key() == cxt.pos.key() { return Panic(NoAdvanceError { pos: cxt.pos }.into()); }
                     curr_pos = advance;

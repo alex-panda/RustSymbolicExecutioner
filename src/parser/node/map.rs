@@ -24,8 +24,8 @@ pub struct MapNode<Child: ParseNode<Ok, Err, Store, Pos, V>, F: Fn(ParseResult<O
 }
 
 impl <Child: ParseNode<Ok, Err, Store, Pos, V>, F: Fn(ParseResult<Ok, Err, Pos>) -> ParseResult<OOk, OErr, Pos>, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, OOk, OErr> ParseNode<OOk, OErr, Store, Pos, V> for MapNode<Child, F, Ok, Err, Store, Pos, V, OOk, OErr> {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<OOk, OErr, Pos> {
-        (self.func)(self.child.do_parse(cxt))
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<OOk, OErr, Pos> {
+        (self.func)(self.child.parse(cxt))
     }
 }
 

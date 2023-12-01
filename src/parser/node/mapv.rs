@@ -21,9 +21,9 @@ pub struct MapVNode<Child: ParseNode<Ok, Err, Store, Pos, V>, F: Fn(Ok) -> OOk, 
 }
 
 impl <Child: ParseNode<Ok, Err, Store, Pos, V>, F: Fn(Ok) -> OOk, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, OOk> ParseNode<OOk, Err, Store, Pos, V> for MapVNode<Child, F, Ok, Err, Store, Pos, V, OOk> {
-    fn do_parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<OOk, Err, Pos> {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<OOk, Err, Pos> {
         use ParseResult::*;
-        match self.child.do_parse(cxt) {
+        match self.child.parse(cxt) {
             Okay(value, advance) => Okay((self.func)(value), advance),
             Error(err) => Error(err),
             Panic(err) => Panic(err),
