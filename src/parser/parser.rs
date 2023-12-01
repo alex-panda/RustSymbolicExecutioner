@@ -597,7 +597,10 @@ mod tests {
 
     #[test]
     fn test_stmt_semi_end_fn() {
-        match parse_file(" fn hello() -> u8 {  (10 + 3) * 3 / 4 ^ (10); 10; 23;  } ") {
+        match parse_file(" fn a(x:i32, y:i32) -> u128 { 
+            let u = 6; 
+            8 / 4; 
+            5 - 2; } ") {
             Okay(value) => {
                 println!("{:?}", value)
             },
