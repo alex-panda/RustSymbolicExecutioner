@@ -107,6 +107,7 @@ int b2_loop(int n)  {
     int j = 1;
     while (i < n) {
         j = j * 2;
+        //i = i + 1;
     }
 	return i;
 }

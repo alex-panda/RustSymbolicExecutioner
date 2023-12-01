@@ -135,3 +135,92 @@ Inputs for which s_ifStmt returns 0: [I32(4), I32(0)]
 Inputs for which s_loop returns 0: [I32(-2147483639)]
 Inputs for which b_loop returns 0: [I32(-2147483640)]
 Inputs for which b2_loop returns 0: [I32(-1073741824)]
+
+────────────────────────────────────────────────────────────────────────────────
+
+Failing input:
+
+        fuzz/artifacts/b_infLoop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+
+Output of `std::fmt::Debug`:
+
+        (
+            -10,
+            10,
+        )
+
+Reproduce with:
+
+        cargo fuzz run b_algebra fuzz/artifacts/b_algebra/crash-ca118198225f629c1fe2fda1c76234fa6024253e
+
+Minimize test case with:
+
+        cargo fuzz tmin b_algebra fuzz/artifacts/b_algebra/crash-ca118198225f629c1fe2fda1c76234fa6024253e
+
+────────────────────────────────────────────────────────────────────────────────
+
+Error: Fuzz target exited with exit status: 77
+Output of `std::fmt::Debug`:
+
+        (
+            0,
+            0,
+        )
+
+Reproduce with:
+
+        cargo fuzz run b_ifStmt fuzz/artifacts/b_ifStmt/crash-e4faefa4502eaf582fb184a2300122f40de097af
+
+Minimize test case with:
+
+        cargo fuzz tmin b_ifStmt fuzz/artifacts/b_ifStmt/crash-e4faefa4502eaf582fb184a2300122f40de097af
+
+────────────────────────────────────────────────────────────────────────────────
+
+Error: Fuzz target exited with exit status: 77
+Output of `std::fmt::Debug`:
+
+        (
+            -114,
+            -114,
+        )
+
+Reproduce with:
+
+        cargo fuzz run b2_ifStmt fuzz/artifacts/b2_ifStmt/crash-0e6e44fdf2d9636d2f49b3cc20a2375be45feef9
+
+Minimize test case with:
+
+        cargo fuzz tmin b2_ifStmt fuzz/artifacts/b2_ifStmt/crash-0e6e44fdf2d9636d2f49b3cc20a2375be45feef9
+
+────────────────────────────────────────────────────────────────────────────────
+
+Error: Fuzz target exited with exit status: 77
+Output of `std::fmt::Debug`:
+
+        91
+
+Reproduce with:
+
+        cargo fuzz run b_loop fuzz/artifacts/b_loop/crash-1e5c2f367f02e47a8c160cda1cd9d91decbac441
+
+Minimize test case with:
+
+        cargo fuzz tmin b_loop fuzz/artifacts/b_loop/crash-1e5c2f367f02e47a8c160cda1cd9d91decbac441
+
+────────────────────────────────────────────────────────────────────────────────
+
+Error: Fuzz target exited with exit status: 77
+Output of `std::fmt::Debug`:
+
+        10
+
+Reproduce with:
+
+        cargo fuzz run b_infLoop fuzz/artifacts/b_infLoop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+
+Minimize test case with:
+
+        cargo fuzz tmin b_infLoop fuzz/artifacts/b_infLoop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+
+────────────────────────────────────────────────────────────────────────────────
