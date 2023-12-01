@@ -1,15 +1,4 @@
 fn main() {
-    let mut x = 5;
-    let mut y = 18;
-
-    s_algebra(x, y);
-}
-
-fn s_algebra(mut x:i32, mut y:i32) -> u8 {
-    x = y + 4;
-    y = 2*x; 
-    let mut w = (x*4) + y;
-    //symex - what are the possible values
     return 0;
 }
 

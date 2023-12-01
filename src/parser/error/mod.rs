@@ -1,3 +1,15 @@
+mod never_error;
+pub use never_error::*;
+
+mod lrec_error;
+pub use lrec_error::*;
+
+mod empty_rule_error;
+pub use empty_rule_error::*;
+
+mod unexpected_none_error;
+pub use unexpected_none_error::*;
+
 mod expected_end_error;
 pub use expected_end_error::*;
 
@@ -37,5 +49,5 @@ pub use out_of_bounds::*;
 mod unexpected_value;
 pub use unexpected_value::*;
 
-mod unexpected_end_error;
-pub use unexpected_end_error::*;
+mod expected_child_error;
+pub use expected_child_error::*;

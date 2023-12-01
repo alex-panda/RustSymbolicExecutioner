@@ -33,7 +33,7 @@ impl <I: Iterator<Item = Item> + ParsePos, Item: ParseValue> ParseStore<I, Item>
     }
 } 
 
-impl ParseStore<usize, char> for &str {
+impl ParseStore<usize, char> for str {
     fn value_at(&self, pos: &mut usize) -> Option<char> {
         let next = self[*pos..].chars().next();
 
@@ -47,5 +47,10 @@ impl ParseStore<usize, char> for &str {
     }
 }
 
+impl ParseStore<usize, char> for &str {
+    fn value_at(&self, pos: &mut usize) -> Option<char> {
+        (**self).value_at(pos)
+    }
+}
 
 

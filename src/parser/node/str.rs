@@ -1,29 +1,29 @@
-use crate::parser::{Span, UnexpectedEndError, UnexpectedValueError};
+use crate::parser::{Span, UnexpectedEndError, UnexpectedValueError, ParseContext};
 
 use super::super::{ParseNode, ParsePos, ParseStore, ParseResult};
 
 use ParseResult::*;
-impl <Err: From<UnexpectedEndError<Pos>> + From<UnexpectedValueError<Pos, char>>, Store: ParseStore<Pos, char>, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, char> for str {
-    fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
-        let mut curr_pos = pos.clone();
+impl <Err: From<UnexpectedEndError<Pos>> + From<UnexpectedValueError<Pos, char>>, Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, char> for str {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, char>) -> ParseResult<Span<Pos>, Err, Pos> {
+        let mut curr_pos = cxt.pos.clone();
         for target_char in self.chars() {
-            match store.value_at(&mut curr_pos) {
+            match cxt.store.value_at(&mut curr_pos) {
                 Some(actual_char) => {
                     if target_char != actual_char {
-                        return Error(UnexpectedValueError { pos, found: actual_char, expected: target_char }.into());
+                        return Error(UnexpectedValueError { pos: cxt.pos, found: actual_char, expected: target_char }.into());
                     }
                 },
                 None => return Error(UnexpectedEndError { pos: curr_pos }.into()),
             }
         }
 
-        OkayAdvance(Span::new(pos, curr_pos.clone()), curr_pos)
+        Okay(Span::new(cxt.pos, curr_pos.clone()), curr_pos)
     }
 }
 
 
-impl <Err: From<UnexpectedEndError<Pos>> + From<UnexpectedValueError<Pos, char>>, Store: ParseStore<Pos, char>, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, char> for String {
-    fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
-        ParseNode::parse(&self.as_str(), store, pos)
+impl <Err: From<UnexpectedEndError<Pos>> + From<UnexpectedValueError<Pos, char>>, Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> ParseNode<Span<Pos>, Err, Store, Pos, char> for String {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, char>) -> ParseResult<Span<Pos>, Err, Pos> {
+        ParseNode::parse(self.as_str(), cxt)
     }
 }

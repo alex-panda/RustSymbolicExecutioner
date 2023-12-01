@@ -1,27 +1,56 @@
 use std::cell::RefCell;
-use crate::parser::{Span, ParsePos, ParseStore, ParseValue, ParseNode, ParseResult, ZSTNode};
+use crate::parser::{Span, ParsePos, ParseStore, ParseValue, ParseNode, ParseResult, ZSTNode, EmptyRuleError, ParseContext};
+
+/// 
+/// A macro to make it easier to declare a rule.
+/// 
+#[macro_export]
+macro_rules! srule {
+    ($id: ident, $id_rule: ident, $ok_ty: ty, $err_ty: ty, $store_ty: ty, $pos_ty: ty, $v_ty: ty) => {
+        let $id_rule = $crate::parser::SRule();
+        let $id: &dyn ParseNode<$ok_ty, $err_ty, $store_ty, $pos_ty, $v_ty> = $id_rule.din();
+    };
+    ($id: ident, $id_rule: ident, $ok_ty: ty, $err_ty: ty, $store_ty: ty, $pos_ty: ty) => {
+        let $id_rule = $crate::parser::SRule();
+        let $id: &dyn ParseNode<$ok_ty, $err_ty, $store_ty, $pos_ty, _> = $id_rule.din();
+    };
+    ($id: ident, $id_rule: ident, $ok_ty: ty, $err_ty: ty, $store_ty: ty) => {
+        let $id_rule = $crate::parser::SRule();
+        let $id: &dyn ParseNode<$ok_ty, $err_ty, $store_ty, _, _> = $id_rule.din();
+    };
+    ($id: ident, $id_rule: ident, $ok_ty: ty, $err_ty: ty) => {
+        let $id_rule = $crate::parser::SRule();
+        let $id: &dyn ParseNode<$ok_ty, $err_ty, _, _, _> = $id_rule.din();
+    };
+    ($id: ident, $id_rule: ident, $ok_ty: ty) => {
+        let $id_rule = $crate::parser::SRule();
+        let $id: &dyn ParseNode<$ok_ty, _, _, _, _> = $id_rule.din();
+    };
+    ($id: ident, $id_rule: ident) => {
+        let $id_rule = $crate::parser::SRule();
+        let $id = $id_rule.din();
+    };
+}
 
 /// 
 /// A stack rule i.e. a `Rule` that lives on the stack.
 /// 
 #[allow(non_snake_case)]
 #[inline]
-pub fn SRule<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>() -> StackRuleNode<Child, Ok, Err, Store, Pos, V> {
+pub fn SRule<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: From<EmptyRuleError>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>() -> StackRuleNode<Child, Ok, Err, Store, Pos, V> {
     StackRuleNode::new()
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct StackRuleNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> {
-    child: RefCell<Option<Child>>,
+pub struct StackRuleNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: From<EmptyRuleError>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> {
+    child: RefCell<Option<Box<Child>>>,
     pub(crate) _zst: ZSTNode<Ok, Err, Store, Pos, V>
 }
 
-
-impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> StackRuleNode<Child, Ok, Err, Store, Pos, V> {
+impl <Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: From<EmptyRuleError>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> StackRuleNode<Child, Ok, Err, Store, Pos, V> {
     #[inline]
-    pub fn new_set(child: Child) -> Self {
+    pub fn with(child: Child) -> Self {
         StackRuleNode {
-            child: RefCell::new(Some(child)),
+            child: RefCell::new(Some(Box::new(child))),
             _zst: ZSTNode::default()
         }
     }
@@ -34,26 +63,37 @@ impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: P
         }
     }
 
+    pub fn din<'a>(&'a self) -> &dyn ParseNode<Ok, Err, Store, Pos, V> {
+        self
+    }
+
     #[inline]
     pub fn set(&self, child: Child) {
-        *self.child.borrow_mut() = Some(child);
+        *self.child.borrow_mut() = Some(Box::new(child));
     }
 }
 
-impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Ok, Err, Store, Pos, V> for StackRuleNode<Child, Ok, Err, Store, Pos, V> {
-    fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Ok, Err, Pos> {
+impl <Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: From<EmptyRuleError>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<Ok, Err, Store, Pos, V> for StackRuleNode<Child, Ok, Err, Store, Pos, V> {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
         if let Some(child) = &*self.child.borrow() {
-            child.parse(store, pos)
+            child.parse(cxt)
         } else {
-            panic!("a `StackParseRule` was not initialized by the time its `parse` function was called");
+            ParseResult::Error(EmptyRuleError.into())
         }
     }
 
-    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
+    fn parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
         if let Some(child) = &*self.child.borrow() {
-            child.parse_span(store, pos)
+            child.parse_span(cxt)
         } else {
-            panic!("a `StackParseRule` was not initialized by the time its `parse_span` function was called");
+            ParseResult::Error(EmptyRuleError.into())
         }
+    }
+}
+
+
+impl <Child: ParseNode<Ok, Err, Store, Pos, V> + Clone, Ok, Err: From<EmptyRuleError>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> Clone for StackRuleNode<Child, Ok, Err, Store, Pos, V> {
+    fn clone(&self) -> Self {
+        Self { child: self.child.clone(), _zst: self._zst.clone() }
     }
 }

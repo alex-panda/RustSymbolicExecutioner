@@ -1,4 +1,4 @@
-use crate::parser::{ZSTNode, Span};
+use crate::parser::{ZSTNode, Span, ParseContext};
 
 use super::super::{ParseStore, ParsePos, ParseValue, ParseNode, ParseResult};
 
@@ -9,33 +9,37 @@ use super::super::{ParseStore, ParsePos, ParseValue, ParseNode, ParseResult};
 /// `ParseResult::OkayAdvance(Some(Ok), Pos)`.
 /// 
 #[allow(non_snake_case)]
-pub fn Maybe<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue>(child: Child) -> MaybeNode<Child, Ok, Err, Store, Pos, V> {
+pub fn Maybe<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(child: Child) -> MaybeNode<Child, Ok, Err, Store, Pos, V> {
     MaybeNode { child, zst: ZSTNode::default() }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct MaybeNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> {
+pub struct MaybeNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> {
     pub child: Child,
     zst: ZSTNode<Ok, Err, Store, Pos, V>,
 }
 
 use ParseResult::*;
-impl <Ok, Err, Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Option<Ok>, Err, Store, Pos, V> for MaybeNode<Child, Ok, Err, Store, Pos, V> {
-    fn parse(&self, store: &Store, pos: Pos) -> ParseResult<Option<Ok>, Err, Pos> {
-        match self.child.parse(store, pos) {
-            Okay(value) => Okay(Some(value)),
-            OkayAdvance(value, advance) => OkayAdvance(Some(value), advance),
-            Error(_) => Okay(None),
+impl <Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>> ParseNode<Option<Ok>, Err, Store, Pos, V> for MaybeNode<Child, Ok, Err, Store, Pos, V> {
+    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Option<Ok>, Err, Pos> {
+        match self.child.parse(cxt.clone()) {
+            Okay(value, advance) => Okay(Some(value), advance),
+            Error(_) => Okay(None, cxt.pos),
             Panic(error) => Panic(error),
         }
     }
 
-    fn parse_span(&self, store: &Store, pos: Pos) -> ParseResult<Span<Pos>, Err, Pos> {
-        match self.child.parse_span(store, pos.clone()) {
-            Okay(_) => Okay(Span::new(pos.clone(), pos)),
-            OkayAdvance(_, advance) => OkayAdvance(Span::new(pos, advance.clone()), advance),
-            Error(_) => Okay(Span::new(pos.clone(), pos)),
+    fn parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
+        match self.child.parse_span(cxt.clone()) {
+            Okay(_, advance) => Okay(Span::new(cxt.pos, advance.clone()), advance),
+            Error(_) => Okay(Span::new(cxt.pos.clone(), cxt.pos.clone()), cxt.pos),
             Panic(error) => Panic(error),
         }
+    }
+}
+
+
+impl <Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V> + Clone> Clone for MaybeNode<Child, Ok, Err, Store, Pos, V> {
+    fn clone(&self) -> Self {
+        Self { child: self.child.clone(), zst: self.zst.clone() }
     }
 }

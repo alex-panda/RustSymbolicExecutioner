@@ -1,5 +1,4 @@
-use std::{fmt::{Debug, Display}, hash::Hash};
-
+use core::{hash::Hash, fmt::{Debug, Display}};
 
 ///
 /// A position in a parse.
@@ -13,12 +12,11 @@ use std::{fmt::{Debug, Display}, hash::Hash};
 /// One, for instance, cannot return `None` earlier than the other.
 /// 
 pub trait ParsePos: Debug + Display + Clone {
-    type Key: Clone + PartialEq + Hash;
-
+    type Key: Hash + Eq + Clone;
     fn key(&self) -> Self::Key;
 }
 
 impl ParsePos for usize {
     type Key = usize;
-    fn key(&self) -> Self::Key { *self }
+    fn key(&self) -> usize { *self }
 }
