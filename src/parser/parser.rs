@@ -181,6 +181,12 @@ pub enum RExpr {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Whitespace {
+    Comment(RComment),
+    Blank(Span<PPos>),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BinOp {
     // Type Cast
     As,
@@ -230,6 +236,9 @@ pub enum AssignOp {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RStatement {
+    Comment {
+        comment: RComment,
+    },
     /// An expression with an optional semicolon after it (semicolon can only be omitted if it is at the end of a group).
     Expr {
         expr: RExpr,
@@ -298,6 +307,10 @@ pub struct RFn {
 /// 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RComment {
+    Symex {
+        symex: Span<PPos>,
+        follow: Span<PPos>,
+    },
     Line {
         /// Span including "//"
         span: Span<PPos>,
@@ -689,7 +702,8 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
     // --- COMMENTS ---
 
-    comment_rule.set(SpanOf(Funnel7(
+    comment_rule.set(Funnel8(
+        MapV(("//", OneOf2(Not(OneOf(['/', '!', '\n'])), "//"), "symex", SpanOf(ZeroOrMore((Not('\n'), AnyV())))), |(_, _, symex, follow)| RComment::Symex { symex, follow }),
         line_comment,
         block_comment,
         inner_line_doc,
@@ -697,7 +711,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         outer_line_doc,
         outer_block_doc,
         block_comment_or_doc,
-    )));
+    ));
 
     line_comment_rule.set(MapV(
         Spanned(OneOf2(
@@ -803,7 +817,10 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     // --- whitespace ---
 
     // a rule that just consumes whitespace space
-    w_rule.set(Mem(SpanOf(ZeroOrMore(OneOf3(..=32u32, 127u32, comment)))));
+    w_rule.set(ZeroOrMore(Funnel2(
+        MapV(SpanOf(OneOf2(..=32u32, 127u32)), |s| Whitespace::Blank(s)),
+        MapV(comment, |c| Whitespace::Comment(c)),
+    )));
 
     // a rule to parse an ascii letter (lower case or upper case)
     alpha_rule.set(SpanOf(OneOf2(97..=122, 65..=90)));
@@ -1269,14 +1286,29 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
                     |_, _, e| e,
                     |_, ocbrace_span, _, _| panic(ocbrace_span, "block", "openning curly brace is missing its complementary closing curly brace to end the scope"),
                 ),
-            |(_lcbrace, (_, statements, expr), _rcbrace)| {
+            |(_lcbrace, (w, statements, expr), _rcbrace)| {
                 RBlock {
                     statements: {
-                        let mut statements: Vec<RStatement> = statements.into_iter().map(|(v,_)|v).collect();
-                        if let Some(expr) = expr.map(|(e, _)| e) {
-                            statements.push(RStatement::Expr { expr, semi: None });
+                        let mut stmts: Vec<RStatement> = Vec::new();
+                        for wh in w {
+                            match wh {
+                                Whitespace::Blank(_) => {},
+                                Whitespace::Comment(comment) => stmts.push(RStatement::Comment { comment })
+                            }
                         }
-                        statements
+                        for (stmt, whitespace) in statements {
+                            stmts.push(stmt);
+                            for w in whitespace {
+                                match w {
+                                    Whitespace::Blank(_) => {},
+                                    Whitespace::Comment(comment) => stmts.push(RStatement::Comment { comment })
+                                }
+                            }
+                        }
+                        if let Some(expr) = expr.map(|(e, _)| e) {
+                            stmts.push(RStatement::Expr { expr, semi: None });
+                        }
+                        stmts
                     },
                 }
             }

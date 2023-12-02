@@ -23,9 +23,9 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 /// one child.
 /// 
 /// ```{text}
-/// Conceptually, the first child's results become
+/// Conceptually, we start by parsing the first node (seperated by the second node) some number of times, putting each result onto a vector.
 /// vec![expr1, expr2, expr3, expr4]
-/// which then the function of the node turns into the AST
+/// Then, we use some number of calls of the given function to turn it into a left-recursive AST.
 ///         Add
 ///         / \
 ///       Add expr4
@@ -33,15 +33,14 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 ///     Add expr3
 ///     / \
 /// expr1 expr2
-/// after the function is called repeatedly.
 /// 
-/// As a breakdown, the result starts like this:
+/// To break this down into more steps, the result starts like this:
 /// 
 /// vec![expr1, expr2, expr3, expr4]
 /// 
 /// Empty AST
 /// 
-/// Then, after one call of the function, the result looks like this (`Add` is what was returned by the function and it is only mentally marked (in truth it is just an `Expr` type like everything else)):
+/// Then, after one call of the function, the result looks like this (`Add` is what was returned by the function):
 /// vec![Add, expr3, expr4]
 /// 
 ///     Add
@@ -67,7 +66,7 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 ///     / \
 /// expr1 expr2
 /// 
-/// Since there is only one result left, `Add2` is returned as the final result.
+/// Since there is only one result left in the vector, said result (`Add2`) is returned as the final result of the parse.
 /// ```
 /// 
 #[allow(non_snake_case)]
