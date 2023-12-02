@@ -4,12 +4,70 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 /// # Left-to-Right Join Node
 /// 
 /// Returns a node that will parse one or more of its first child as long as
-/// each consecutive parse of its first child has a successful parse of the
-/// second child between it and the last successful parse. Every two parses of
-/// the first child are combined into a single result using the given
-/// function. As such, this node will return only a single result of the first
-/// child. If, instead, you would like a list of joined results, use the `Join`
-/// node instead.
+/// each consecutive parse of its first child has a successful parse of its
+/// second child between it and the previous successfull parse of the first
+/// child. Every two parses of the first child are combined, from left to right,
+/// into a single result using the given function. As such, this node will
+/// return only a single result that is the same type as that which its first
+/// child produces. If, instead, you would like a list of joined results without
+/// a function congealing them into a single result, use the `Join` node instead.
+/// 
+/// One reason to use this node would be to create a left-recursive AST without
+/// left recursion. For example, `LRJoin(expr, '+', |left, _, right| Expr::Add { left, right })`
+/// will parse one or more expressions so long as each expression has a `'+'`
+/// between it and the previous one. Then, the node will pass the left-most
+/// result in as the first argument of the given function, the `'+'` result as the
+/// second argument of the function, and the second left-most child in as the third
+/// argument of the function. What the function returns will then be considered
+/// the left-most result and the process will repeat again until there is only
+/// one child.
+/// 
+/// ```{text}
+/// Conceptually, we start by parsing the first node (seperated by the second node) some number of times, putting each result onto a vector.
+/// vec![expr1, expr2, expr3, expr4]
+/// Then, we use some number of calls of the given function to turn it into a left-recursive AST.
+///         Add
+///         / \
+///       Add expr4
+///       / \
+///     Add expr3
+///     / \
+/// expr1 expr2
+/// 
+/// To break this down into more steps, the result starts like this:
+/// 
+/// vec![expr1, expr2, expr3, expr4]
+/// 
+/// Empty AST
+/// 
+/// Then, after one call of the function, the result looks like this (`Add` is what was returned by the function):
+/// vec![Add, expr3, expr4]
+/// 
+///     Add
+///     / \
+/// expr1 expr2
+/// 
+/// After another call, the result looks like this:
+/// vec![Add1, expr4]
+/// 
+///       Add1
+///       / \
+///     Add expr3
+///     / \
+/// expr1 expr2
+/// 
+/// After another call, the result then looks like this:
+/// vec![Add2]
+///          Add2
+///          / \
+///       Add1 expr4
+///       / \
+///     Add expr3
+///     / \
+/// expr1 expr2
+/// 
+/// Since there is only one result left in the vector, said result (`Add2`) is returned as the final result of the parse.
+/// ```
 /// 
 #[allow(non_snake_case)]
 pub fn LRJoin<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, J: Fn(Ok1, Ok2, Ok1) -> Ok1, Ok1, Ok2, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(child1: Child1, child2: Child2, join: J) -> LRJoinNode<Child1, Child2, J, Ok1, Ok2, Err, Store, Pos, V> {
