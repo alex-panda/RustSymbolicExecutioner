@@ -8,8 +8,11 @@ pub struct SymSolver {
     assert_str: String,
 }
 
+//TODO update to actually generate LISP
 pub fn format_assertion(assert: &String) -> String {
-    return "(= 5 5)".to_string();
+    let mut lisp = "(= 5 5)".to_string();
+    println!("{}", lisp); //debugging
+    return lisp;
 }
 
 impl SymSolver {
@@ -86,7 +89,24 @@ impl SymSolver {
     }
 }
 
+
+
 #[cfg(test)]
 mod tests {
+    use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
+    use crate::symex::{SymVar, SymSolver, SymExEngine};
+
+    #[test]
+    pub fn test_lisp() -> Result<(), Box<dyn std::error::Error>> {
+        let mut s = SymSolver::new();
+        //add any variables used in expressions here with the method detailed below
+        s.add_int("x".to_string());
+        s.add_int("y".to_string());
+
+        s.add_assertion_to_solver("y == x + 12");
+
+        let is_sat = s.check_sat()?;
+        assert!(is_sat);
+    }
 
 }
