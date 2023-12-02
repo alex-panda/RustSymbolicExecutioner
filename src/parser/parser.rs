@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{parser::{AnyOf6, ParseContext, OneOf, Not, AnyV, Funnel5, Funnel4, AnyMemTable, Funnel6, Join, Mem, Funnel2, AnyOf10, OneOf9, AnyOf9, OneOf8, MapPValue, Funnel9, LRJoin, Trace, Funnel10, Never}, srule};
+use crate::{parser::{AnyOf6, ParseContext, OneOf, Not, AnyV, Funnel5, Funnel4, AnyMemTable, Funnel6, Join, Mem, Funnel2, AnyOf10, OneOf9, AnyOf9, OneOf8, MapPValue, Funnel9, LRJoin, Trace, Funnel10, Never, Funnel3, Funnel7, Funnel8, Funnel11, AnyOf8, OneOf11, AnyOf11, RLJoin, Funnel12, DPrint}, srule};
 
 use super::{ParseResult, Span, ZeroOrMore, ParseNode, SpanOf, Map, OneOf3, Spanned, OneOrMore, AnyOf3, Maybe, AnyOf2, MapV, OneOf6, SRule, Leader, Surround, End, Req, OneOf5, AnyOf5, AnyOf4, OneOf4, OneOf2, ParsePos, ParseStore};
 
@@ -90,7 +90,8 @@ impl ParseStore<PPos, char> for &str {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct RArg {
+pub struct RParam {
+    pub mutable: Option<Span<PPos>>,
     pub id: Span<PPos>,
     pub ty: RType,
 }
@@ -122,6 +123,22 @@ pub enum RIf {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum RLoop {
+    Infinite {
+        block: RBlock,
+    },
+    While {
+        expr: RExpr,
+        block: RBlock,
+    },
+    For {
+        var: Span<PPos>,
+        expr: RExpr,
+        block: RBlock,
+    },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RType {
     Array {
         /// The type of every item in the array (since arrays can only hold 1
@@ -148,11 +165,67 @@ pub enum RExpr {
     Var(Span<PPos>),
     Path(Vec<Span<PPos>>),
     Block(RBlock),
-    Add(Box<RExpr>, Span<PPos>, Box<RExpr>),
-    Sub(Box<RExpr>, Span<PPos>, Box<RExpr>),
-    Div(Box<RExpr>, Span<PPos>, Box<RExpr>),
-    Mul(Box<RExpr>, Span<PPos>, Box<RExpr>),
-    Pow(Box<RExpr>, Span<PPos>, Box<RExpr>),
+    If(Box<RIf>),
+    Loop(Box<RLoop>),
+
+    Call { ident: Span<PPos>, args: Vec<RExpr> },
+
+    Deref { star: Span<PPos>, expr: Box<RExpr> },
+    Borrow { and: Span<PPos>, expr: Box<RExpr> },
+    BorrowMut { and: Span<PPos>, mutable: Span<PPos>, expr: Box<RExpr> },
+    Negate { neg: Span<PPos>, expr: Box<RExpr> },
+    Not { not: Span<PPos>, expr: Box<RExpr> },
+
+    AssignOp { left: Box<RExpr>, op: AssignOp, op_span: Span<PPos>, right: Box<RExpr> },
+    BinOp { left: Box<RExpr>, op: BinOp, op_span: Span<PPos>, right: Box<RExpr> },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum BinOp {
+    // Type Cast
+    As,
+
+    // Logical
+    EqEq,
+    NotEq,
+    LessThan,
+    MoreThan,
+    LessThanEq,
+    MoreThanEq,
+    And,
+    Or,
+
+    // Bits
+    LSh,
+    RSh,
+    BitAnd,
+    BitOr,
+    BitXOr,
+
+    // Arithmetic
+    Add,
+    Sub,
+    Div,
+    Mod,
+    Mul,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum AssignOp {
+    // Assignment
+    Assign,
+
+    // Compound Assignment
+    AAdd,
+    ASub,
+    AMul,
+    ADiv,
+    AMod,
+    AAnd,
+    AOr,
+    AXOr,
+    ALSh,
+    ARSh,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -176,10 +249,16 @@ pub enum RStatement {
     If {
         stmt: RIf,
     },
+    /// A loop of one form or another.
+    Loop {
+        stmt: RLoop,
+    },
     /// Assign a variable a value
     Assign {
         /// The `let` keyword span.
         let_: Span<PPos>,
+        /// The span of the mutable keyword (if given)
+        mutable: Option<Span<PPos>>,
         /// The variable name.
         ident: Span<PPos>,
         /// The optionally-specified type.
@@ -197,7 +276,7 @@ pub enum RStatement {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RReturnType {
     /// Returns the given type.
-    Type(Span<PPos>),
+    Type(RType),
     /// Function never returns.
     Never,
 }
@@ -207,9 +286,54 @@ pub struct RFn {
     pub span: Span<PPos>,
     pub fn_span: Span<PPos>,
     pub id: Span<PPos>,
-    pub args: Vec<RArg>,
-    pub ret_type: RReturnType,
+    pub args: Vec<RParam>,
+    pub ret_type: Option<RReturnType>,
     pub body: RBlock,
+}
+
+// Comments
+
+/// 
+/// A comment in Rust.
+/// 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum RComment {
+    Line {
+        /// Span including "//"
+        span: Span<PPos>,
+        /// Span of just the comment text.
+        text: Span<PPos>,
+    },
+    Block {
+        /// Span including "/*" and "*/"
+        span: Span<PPos>,
+        /// The comment's text.
+        text: Span<PPos>,
+    },
+    InnerLineDoc {
+        /// Span including "//!".
+        span: Span<PPos>,
+        /// The doc comment's text.
+        text: Span<PPos>,
+    },
+    InnerBlockDoc {
+        /// Span including "/*!" and "*/".
+        span: Span<PPos>,
+        /// The doc comment's text.
+        text: Span<PPos>,
+    },
+    OuterLineDoc {
+        /// Span including "///".
+        span: Span<PPos>,
+        /// The doc comment's text.
+        text: Span<PPos>,
+    },
+    OuterBlockDoc {
+        /// Span including "/**" and "*/".
+        span: Span<PPos>,
+        /// The doc comment's text.
+        text: Span<PPos>,
+    },
 }
 
 // -- Literals --
@@ -451,7 +575,7 @@ use ParseResult::*;
 /// Parses a file and returns the result.
 /// 
 pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
-    println!("Parsing: \"{}\"", file_text);
+    //println!("Parsing: \"{}\"", file_text);
 
     // create `expr` (it requires a number of recursive child nodes)
     srule!(w, w_rule);
@@ -484,6 +608,10 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     srule!(integer_literal, integer_literal_rule);
     srule!(float_literal, float_literal_rule);
     srule!(bool_literal, bool_literal_rule);
+    srule!(dec_literal, dec_literal_rule);
+    srule!(bin_literal, bin_literal_rule);
+    srule!(oct_literal, oct_literal_rule);
+    srule!(hex_literal, hex_literal_rule);
 
     srule!(quote_escape, quote_escape_rule);
     srule!(ascii_escape, ascii_escape_rule);
@@ -499,10 +627,6 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     srule!(ascii_for_string, ascii_for_string_rule);
     srule!(raw_byte_string_content, raw_byte_string_content_rule);
     srule!(ascii, ascii_rule);
-    srule!(dec_literal, dec_literal_rule);
-    srule!(bin_literal, bin_literal_rule);
-    srule!(oct_literal, oct_literal_rule);
-    srule!(hex_literal, hex_literal_rule);
     srule!(dec_digit, dec_digit_rule);
     srule!(bin_digit, bin_digit_rule);
     srule!(tuple_index, tuple_index_rule);
@@ -515,9 +639,23 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     srule!(semi_statement, semi_statement_rule);
 
     srule!(if_statement, if_statement_rule);
+    srule!(loop_statement, loop_statement_rule);
+    srule!(infinite_loop, infinite_loop_rule);
+    srule!(while_loop, while_loop_rule);
+    srule!(for_loop, for_loop_rule);
 
-    // trace levels
-    const RULE_NAMES: i32 = 1;
+    srule!(logic_op, logic_op_rule);
+    srule!(add_or_sub, add_or_sub_rule);
+    srule!(assign, assign_rule);
+
+    srule!(comment, comment_rule);
+    srule!(line_comment, line_comment_rule);
+    srule!(block_comment, block_comment_rule);
+    srule!(inner_line_doc, inner_line_doc_rule);
+    srule!(inner_block_doc, inner_block_doc_rule);
+    srule!(outer_line_doc, outer_line_doc_rule);
+    srule!(outer_block_doc, outer_block_doc_rule);
+    srule!(block_comment_or_doc, block_comment_or_doc_rule);
 
     // define function to produce "panic" uniform messages of parse
     let panic_fn = |pos: Span<PPos>, fn_name: &str, message: &str| -> String {
@@ -549,6 +687,113 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 //    });
 //    let xid_continue = &xid_continue;
 
+    // --- COMMENTS ---
+
+    comment_rule.set(SpanOf(Funnel7(
+        line_comment,
+        block_comment,
+        inner_line_doc,
+        inner_block_doc,
+        outer_line_doc,
+        outer_block_doc,
+        block_comment_or_doc,
+    )));
+
+    line_comment_rule.set(MapV(
+        Spanned(OneOf2(
+            ("//", OneOf2(Not(OneOf(['/', '!', '\n'])), "//"), SpanOf(ZeroOrMore((Not('\n'), AnyV())))),
+            "//"
+        )),
+        |(span, any_of_two)| {
+            match any_of_two {
+                AnyOf2::Child1((_, _, text)) => RComment::Line { span, text },
+                AnyOf2::Child2(span)         => RComment::Line { span: span.clone(), text: span },
+            }
+        }
+    ));
+
+    block_comment_rule.set(MapV(
+        Spanned(Surround(
+            "/*",
+            SpanOf((
+                OneOf3(
+                    Not(OneOf(['*', '!'])),
+                    "**",
+                    block_comment_or_doc
+                ),
+                ZeroOrMore(OneOf2(
+                    block_comment_or_doc,
+                    (Not("*/"), AnyV())
+                )),
+            )),
+            "*/",
+            |_, _, e| e,
+            |_, start_span, _, _| panic(start_span, "block_comment", "expected end to this block comment"),
+        )),
+        |(span, (_, text, _))| {
+            RComment::Block { span, text }
+        }
+    ));
+
+    inner_line_doc_rule.set(MapV(
+        Spanned((
+            "//!",
+            SpanOf(ZeroOrMore((Not(OneOf2('\n', isolated_cr)), AnyV())))
+        )),
+        |(span, (_, text))| {
+            RComment::InnerLineDoc { span, text }
+        }
+    ));
+
+    inner_block_doc_rule.set(MapV(
+        Spanned(Surround(
+            "/*!",
+            SpanOf(ZeroOrMore(OneOf2(block_comment_or_doc, (Not(OneOf2("*/", isolated_cr)), AnyV())))),
+            "*/",
+            |_, _, e| e,
+            |_, start_span, _, _| panic(start_span, "inner_block_doc", "expected end to this block doc comment"),
+        )),
+        |(span, (_, text, _))| {
+            RComment::InnerBlockDoc { span, text }
+        }
+    ));
+
+    outer_line_doc_rule.set(MapV(
+        Spanned((
+            "///",
+            SpanOf(Maybe((Not('/'), ZeroOrMore(Not(OneOf2('\n', isolated_cr))))))
+        )),
+        |(span, (_, text))| {
+            RComment::OuterLineDoc { span, text }
+        }
+    ));
+
+    outer_block_doc_rule.set(MapV(
+        Spanned(Surround(
+            "/**",
+            SpanOf((OneOf2(Not('*'), block_comment_or_doc), ZeroOrMore(OneOf2(block_comment_or_doc, (Not(OneOf2("*/", isolated_cr)), AnyV()))))),
+            "*/",
+            |_, _, e| e,
+            |_, start_span, _, _| panic(start_span, "inner_block_doc", "expected end to this block doc comment"),
+        )),
+        |(span, (_, text, _))| {
+            RComment::OuterBlockDoc { span, text }
+        }
+    ));
+
+    block_comment_or_doc_rule.set(
+        MapV(
+            OneOf3(block_comment, outer_block_doc, inner_block_doc),
+            |any_of_three| {
+                match any_of_three {
+                    AnyOf3::Child1(v) => v,
+                    AnyOf3::Child2(v) => v,
+                    AnyOf3::Child3(v) => v,
+                }
+            }
+        )
+    );
+
     // - SUFFIX -
 
     suffix_rule.set(ident);
@@ -558,7 +803,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     // --- whitespace ---
 
     // a rule that just consumes whitespace space
-    w_rule.set(SpanOf(ZeroOrMore(OneOf2(..=32u32, 127u32))));
+    w_rule.set(Mem(SpanOf(ZeroOrMore(OneOf3(..=32u32, 127u32, comment)))));
 
     // a rule to parse an ascii letter (lower case or upper case)
     alpha_rule.set(SpanOf(OneOf2(97..=122, 65..=90)));
@@ -573,11 +818,11 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     return_type_rule.set(Map(
-        Leader("->", (w, OneOf2(ident, '!')), |_, arrow_span, _| panic(arrow_span, "return_type", "missing return type")),
+        Leader("->", (w, OneOf2(ty, '!')), |_, arrow_span, _| panic(arrow_span, "return_type", "missing return type")),
         |res| {
             res.map_value(|(_arrow, (_, any_of_two))| {
                 match any_of_two {
-                    AnyOf2::Child1(id) => RReturnType::Type(id),
+                    AnyOf2::Child1(ty) => RReturnType::Type(ty),
                     AnyOf2::Child2(_) => RReturnType::Never,
                 }
             })
@@ -705,7 +950,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     // - BYTE LITERAL -
 
     byte_literal_rule.set(MapV(
-        Spanned(('b', ',', SpanOf(OneOf2(ascii_for_char, byte_escape)), '\'', Maybe(suffix))),
+        Spanned(('b', '0', SpanOf(OneOf2(ascii_for_char, byte_escape)), '\'', Maybe(suffix))),
         |(span, (_, _, value, _, suffix))| { RByteLit { span, value, suffix } }
     ));
 
@@ -808,13 +1053,17 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         |(span, (_, value))| { RHexLit { span, value } }
     ));
 
-    bin_digit_rule.set('0'..='1');
+    bin_digit_rule.set(OneOf(['0', '1']));
 
-    oct_digit_rule.set('0'..='7');
+    oct_digit_rule.set(48..=55);
 
-    dec_digit_rule.set('0'..='9');
+    dec_digit_rule.set(48..=57);
 
-    hex_digit_rule.set(SpanOf(OneOf3('0'..='9', 'a'..='f', 'A'..='F')));
+    hex_digit_rule.set(SpanOf(OneOf3(
+        dec_digit,
+        65..=70, // upper case
+        97..=102 // lower case
+    )));
 
     tuple_index_rule.set(integer_literal);
 
@@ -919,40 +1168,94 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
     // --- Expressions ---
 
+    use BinOp::*;
+    use AssignOp::*;
     {
-        expr_rule.set(
+        use RExpr::{BinOp, AssignOp};
+
+        expr_rule.set(assign);
+
+        assign_rule.set(
+            RLJoin(logic_op, (w, OneOf11('=', "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="), w),
+                |left, (_, op, _), right| {
+                    use AnyOf11::*;
+                    match op {
+                        Child1(op_span) => AssignOp { left: Box::new(left), op: Assign, op_span, right: Box::new(right) },
+                        Child2(op_span) => AssignOp { left: Box::new(left), op: AAdd, op_span, right: Box::new(right) },
+                        Child3(op_span) => AssignOp { left: Box::new(left), op: ASub, op_span, right: Box::new(right) },
+                        Child4(op_span) => AssignOp { left: Box::new(left), op: AMul, op_span, right: Box::new(right) },
+                        Child5(op_span) => AssignOp { left: Box::new(left), op: ADiv, op_span, right: Box::new(right) },
+                        Child6(op_span) => AssignOp { left: Box::new(left), op: AMod, op_span, right: Box::new(right) },
+                        Child7(op_span) => AssignOp { left: Box::new(left), op: AAnd, op_span, right: Box::new(right) },
+                        Child8(op_span) => AssignOp { left: Box::new(left), op: AOr, op_span, right: Box::new(right) },
+                        Child9(op_span) => AssignOp { left: Box::new(left), op: AXOr, op_span, right: Box::new(right) },
+                        Child10(op_span) => AssignOp { left: Box::new(left), op: ALSh, op_span, right: Box::new(right) },
+                        Child11(op_span) => AssignOp { left: Box::new(left), op: ARSh, op_span, right: Box::new(right) },
+                    }
+                }
+            )
+        );
+
+        logic_op_rule.set(
+            LRJoin(add_or_sub, (w, OneOf8("&&", "||", "==", "!=", "<=", ">=", "<", ">"), w),
+                |left, (_, op, _), right| {
+                    use AnyOf8::*;
+                    match op {
+                        Child1(op_span) => BinOp { left: Box::new(left), op: And       , op_span, right: Box::new(right) },
+                        Child2(op_span) => BinOp { left: Box::new(left), op: Or        , op_span, right: Box::new(right) },
+                        Child3(op_span) => BinOp { left: Box::new(left), op: EqEq      , op_span, right: Box::new(right) },
+                        Child4(op_span) => BinOp { left: Box::new(left), op: NotEq     , op_span, right: Box::new(right) },
+                        Child5(op_span) => BinOp { left: Box::new(left), op: LessThanEq, op_span, right: Box::new(right) },
+                        Child6(op_span) => BinOp { left: Box::new(left), op: MoreThanEq, op_span, right: Box::new(right) },
+                        Child7(op_span) => BinOp { left: Box::new(left), op: LessThan  , op_span, right: Box::new(right) },
+                        Child8(op_span) => BinOp { left: Box::new(left), op: MoreThan  , op_span, right: Box::new(right) },
+                    }
+                }
+            )
+        );
+
+        add_or_sub_rule.set(
             LRJoin(mul_or_div, (w, OneOf2('+', '-'), w),
             |left, (_, op, _), right| {
                 match op {
-                    AnyOf2::Child1(span) => RExpr::Add(Box::new(left), span, Box::new(right)),
-                    AnyOf2::Child2(span) => RExpr::Sub(Box::new(left), span, Box::new(right)),
+                    AnyOf2::Child1(op_span) => BinOp { left: Box::new(left), op: Add, op_span, right: Box::new(right) },
+                    AnyOf2::Child2(op_span) => BinOp { left: Box::new(left), op: Sub, op_span, right: Box::new(right) },
                 }
             })
         );
 
         mul_or_div_rule.set(
-            LRJoin(power, (w, OneOf2('*', '/'), w),
+            LRJoin(power, (w, OneOf3('*', '/', '%'), w),
             |left, (_, op, _), right| {
                 match op {
-                    AnyOf2::Child1(span) => RExpr::Mul(Box::new(left), span, Box::new(right)),
-                    AnyOf2::Child2(span) => RExpr::Div(Box::new(left), span, Box::new(right)),
+                    AnyOf3::Child1(op_span) => BinOp { left: Box::new(left), op: Mul, op_span, right: Box::new(right) },
+                    AnyOf3::Child2(op_span) => BinOp { left: Box::new(left), op: Div, op_span, right: Box::new(right) },
+                    AnyOf3::Child3(op_span) => BinOp { left: Box::new(left), op: Mod, op_span, right: Box::new(right) },
                 }
             })
         );
 
         power_rule.set(
             LRJoin(value, (w, '^', w),
-            |left, (_, op, _), right| {
-                RExpr::Pow(Box::new(left), op, Box::new(right))
+            |left, (_, op_span, _), right| {
+                BinOp { left: Box::new(left), op: BitXOr, op_span, right: Box::new(right) }
             })
         );
 
         value_rule.set(
-            Funnel4(
-                MapV(ident, |span| RExpr::Var(span)),
-                MapV(literal_expression, |lit| RExpr::Lit(lit)),
+            Funnel12(
+                MapV(('!', w, expr), |(not, _, expr)| RExpr::Not { not, expr: Box::new(expr) }),
+                MapV(('*', w, expr), |(star, _, expr)| RExpr::Deref { star, expr: Box::new(expr) }),
+                MapV(('&', w, "mut", w, expr), |(and, _, mutable, _, expr)| RExpr::BorrowMut { and, mutable, expr: Box::new(expr) }),
+                MapV(('&', w, expr), |(and, _, expr)| RExpr::Borrow { and, expr: Box::new(expr) }),
+                MapV(('-', w, expr), |(neg, _, expr)| RExpr::Negate { neg, expr: Box::new(expr) }),
+                MapV(block, |group| RExpr::Block(group)),
                 MapV(('(', w, expr, w, ')'), |(_, _, e, _, _)| e),
-                MapV(block, |group| RExpr::Block(group))
+                MapV(literal_expression, |lit| RExpr::Lit(lit)),
+                MapV(if_statement, |if_| RExpr::If(Box::new(if_))),
+                MapV(loop_statement, |loop_| RExpr::Loop(Box::new(loop_))),
+                MapV((ident, '(', w, Join(expr, (w, ',', w)), Maybe((w, ',', w)), w, ')'), |(ident, _, _, args, _, _, _)| RExpr::Call { ident, args }),
+                MapV(ident, |span| RExpr::Var(span)),
             ),
         );
     }
@@ -986,9 +1289,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
                 '(',
                     (
                         w,
-                        Maybe(
-                        (ty, w, ZeroOrMore((',', w, ty, w)))
-                        )
+                        Maybe((ty, w, ZeroOrMore((',', w, ty, w))))
                     ),
                 ')',
                 |_, _, e| e,
@@ -1051,8 +1352,9 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
     // --- STATEMENTS ---
 
-    statement_rule.set(Funnel5(
-            MapV(if_statement, |stmt| RStatement::If { stmt }),
+    statement_rule.set(Funnel6(
+            MapV(if_statement,   |stmt| RStatement::If { stmt }),
+            MapV(loop_statement, |stmt| RStatement::Loop { stmt }),
             return_statement,
             let_statement,
             expr_semi_statement,
@@ -1081,12 +1383,13 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         MapV(
             Leader(
                 "let",
-                (w, ident, Maybe((w, ':', w, ty)), w, '=', w, expr, Maybe((w, ';'))),
+                (w, Maybe(("mut", w)), ident, Maybe((w, ':', w, ty)), w, '=', w, expr, Maybe((w, ';'))),
                 |_, let_span, _| panic(let_span, "statement", "expected_variable assignment after this let statement")
             ),
-            |(let_span, (_, ident, maybe_type, _, eq_span, _, expr, maybe_semi))| {
+            |(let_span, (_, mutable, ident, maybe_type, _, eq_span, _, expr, maybe_semi))| {
                 RStatement::Assign {
                     let_: let_span,
+                    mutable: mutable.map(|(s, _)|s),
                     ident,
                     ty: match maybe_type {
                         Some((_, _colon_span, _, ty)) => Some(ty),
@@ -1112,9 +1415,8 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
     semi_statement_rule.set(MapV(
         ";",
-        |semi| {
-            RStatement::SColon { semi }
-        }),
+        |semi| RStatement::SColon { semi }
+        ),
     );
 
     if_statement_rule.set(MapV(Leader(
@@ -1154,6 +1456,27 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         }
     ));
 
+    loop_statement_rule.set(Funnel3(
+        infinite_loop,
+        while_loop,
+        for_loop,
+    ));
+
+    infinite_loop_rule.set(MapV(
+        ("loop", w, block),
+        |(_, _, block)| RLoop::Infinite { block }
+    ));
+
+    while_loop_rule.set(MapV(
+        ("while", w, expr, w, block),
+        |(_, _, expr, _, block)| RLoop::While { expr, block }
+    ));
+
+    for_loop_rule.set(MapV(
+        ("for", w, ident, w, "in", w, expr, w, block),
+        |(_, _, var, _, _, _, expr, _, block)| RLoop::For { var, expr, block }
+    ));
+
     // --- Function ---
 
     // the rule to parse a function
@@ -1168,44 +1491,47 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
                                 |_, oparen_span, _| panic(oparen_span, "func", "expected parameters in this function argument scope"),
                                 |_, oparen_span, _, _| panic(oparen_span, "func", "expected closing parenthesis to match this open parenthesis")
                             ),
-                            Req((w, return_type), |_, p, _| panic(Span::new(p.clone(), p), "func", "function requires a return type")),
+                            Maybe((w, return_type)),
                             Req((w, block), |_, p, _| panic(Span::new(p.clone(), p), "func", "function requires a function body"))
                         ),
                         |_, ident_span, _| panic(ident_span, "func", "expected function parameters and body after function identifier")
                     )
                 ),
                 |_, fn_span, _| panic(fn_span, "func", "expected correct function syntax after 'fn' keyword"))),
-            |(span, (fn_span, (_, (id_span, (_, (_oparen, (_, params, _), _cparen), (_, ret_type), (_, body))))))| {
+            |(span, (fn_span, (_, (id_span, (_, (_oparen, (_, params, _), _cparen), ret_type, (_, body))))))| {
                 RFn {
                     span,
                     fn_span,
                     id: id_span,
                     args: params,
-                    ret_type,
+                    ret_type: ret_type.map(|(_, t)| t),
                     body,
                 }
             }
         )
     );
 
-    // function parameter
-    param_rule.set(MapV(
-        Leader(
-            ident,
-            (w, Leader(
-                    ':', (w, ty),
-                    |_, colon_span, _| panic(colon_span, "param", "missing type after this colon"),
-                )
-            ),
-            |_, id_span, _| panic(id_span, "param", "missing arg's type"),
-        ),
-        |(id, (_, (_colon, (_, ty))))| RArg { id, ty, }
-    ));
-
     // a vector of function parameters
     params_rule.set(MapV(
         (Join(param, (w, ',', w)), Maybe((w, ','))),
         |(params, _)| params
+    ));
+
+    // function parameter
+    param_rule.set(MapV(
+        (
+            Maybe(("mut", w)),
+            Leader(
+                ident,
+                (w, Leader(
+                        ':', (w, ty),
+                        |_, colon_span, _| panic(colon_span, "param", "missing type after this colon"),
+                    )
+                ),
+                |_, id_span, _| panic(id_span, "param", "missing arg's type"),
+            )
+        ),
+        |(mutable, (id, (_, (_colon, (_, ty)))))| RParam { mutable: mutable.map(|(s, _)|s), id, ty, }
     ));
 
     vis_rule.set(
@@ -1221,7 +1547,6 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     item_rule.set(
         MapV(Spanned((Maybe(vis), w, func)), |(span, (vis, _, val))| RItem::Fn { span, vis, val })
     );
-
 
     // the rule to parse a `File`
 
@@ -1242,7 +1567,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         }
     ));
 
-    file.parse(ParseContext::new(&AnyMemTable::new(file_text), PPos::new(), RULE_NAMES))
+    file.parse(ParseContext::new(&AnyMemTable::new(file_text), PPos::new()))
 }
 
 
@@ -1256,11 +1581,29 @@ mod tests {
     use super::PPos;
 
     #[test]
+    fn test_if_stmt() {
+        match parse_file("
+            fn a(x:i32, y:i32) -> u128 { 
+                if x == 2 { }
+            }
+            ") {
+            Okay(value, advance) => {
+                println!("{:?} {:?}", value, advance)
+            },
+            Error(error) => panic!("Error: {}", error),
+            Panic(error) => panic!("Panic: {}", error),
+        }
+    }
+
+    #[test]
     fn test_stmt_semi_end_fn() {
-        match parse_file(" fn a(x:i32, y:i32) -> u128 { 
-            let u = 6; 
-            8 / 4; 
-            5 - 2; } ") {
+        match parse_file("
+            fn a(x:i32, y:i32) -> u128 { 
+                let u = 6; 
+                8 / 4; 
+                5 - 2;
+            }
+            ") {
             Okay(value, advance) => {
                 println!("{:?} {:?}", value, advance)
             },
@@ -1316,6 +1659,130 @@ mod tests {
     #[test]
     fn test_empty() {
         match parse_file("") {
+            Okay(value, advance) => {
+                println!("{}: {:?}", advance, value);
+            },
+            Error(error) => panic!("Error: {}", error),
+            Panic(error) => panic!("Panic: {}", error),
+        }
+    }
+
+    #[test]
+    fn full_test() {
+        let test = "
+fn main() {
+    let mut x = 5;
+    let mut y = 18;
+
+    s_algebra(x, y);
+}
+
+fn s_algebra(mut x:i32, mut y:i32) -> i32 {
+    x = y + 4;
+    y = 2*x; 
+    let mut w = (x*4) + y;
+    //symex - what are the possible values?
+    return w;
+}
+
+fn b_algebra(mut x:i32, mut y:i32) -> i32 {
+    x = y + 4;
+    y = 2*x; 
+    let mut w = x / y;
+    //symex - division by zero?
+    return w;
+}
+
+fn b_ifStmt(mut x:i32, mut y:i32) -> i32 {
+    x = y + 4;
+    y = 2*x; 
+    if x <= 4 {
+        x = 4;
+    }
+
+    else if x > 4 {
+        x = 2;
+    }
+
+    else {
+        y = 0;
+        //symex - is this reachable?
+    }
+    return y;
+}
+fn s_ifStmt(mut x:i32, mut y:i32) -> i32 {
+    x = y + 4;
+    y = 2*x; 
+    if x < 4 {
+        x = 4;
+    }
+
+    else if x > 4 {
+        x = 2;
+    }
+
+    else {
+        y = 0;
+        //symex - is this reachable?
+    }
+    return y;
+}
+
+fn b2_ifStmt(mut x:i32, mut y:i32) -> i32 {
+    if x < 5 {
+        if x >= 5 {
+            y = x;
+        }
+        y = y + 1;
+        //symex - what values can y have?
+    }
+    return y;
+}
+
+fn s2_ifStmt(mut x:i32, mut y:i32) -> i32 {
+    if x < 5 {
+        if x > 5 {
+            y = x;
+        }
+        x = y * 2;
+        //symex
+    }
+    return x;
+}
+
+fn s_loop(n: i64) -> i64 {
+    let mut i: i64 = 0;
+    let mut j: i64 = 1;
+    while i < n {
+        j = j * 2;
+        i = i + 1;
+    }
+    //symex - what is the value of i
+	return i;
+}
+
+fn b_loop(n: i64) -> i64 {
+    let mut i: i64 = 0;
+    let mut j: i64 = 1;
+    while i <= n {
+        j = j * 2;
+        i = i + 1;
+    }
+    //symex - what is the value of i
+	return i;
+}
+
+fn b_infLoop(n: i64) -> i64 {
+    let mut i = 0;
+    let mut j = 1;
+    while i < n {
+        j = j * 2;
+    }
+	return i;
+}
+        ";
+
+        match parse_file(test) {
             Okay(value, advance) => {
                 println!("{}: {:?}", advance, value);
             },

@@ -55,7 +55,7 @@ impl <Pos: ParsePos> Display for Span<Pos> {
         Display::fmt(&self.start, f)?;
         f.write_str("-")?;
         Display::fmt(&self.end, f)?;
-        f.write_str(")")
+        f.write_str("]")
     }
 }
 

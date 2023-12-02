@@ -2,7 +2,7 @@ use crate::parser::{Span, UnexpectedEndError, ParseContext};
 
 use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult};
 
-#[inline]
+#[allow(non_snake_case)]
 pub fn AnyV() -> AnyVNode {
     AnyVNode
 }
