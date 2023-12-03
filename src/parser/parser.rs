@@ -88,6 +88,71 @@ impl ParseStore<PPos, char> for &str {
         (**self).value_at(pos)
     }
 }
+type ReturnResult = Result<bool, ()>;
+
+pub trait Execute<Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult;
+}
+
+impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> Execute<Store, Pos> for RCrate{
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult {
+        for item in self.items.iter() {
+            item.execute(store, engine, id)?;
+        }
+        return Ok(true);
+    }
+}
+
+impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> Execute<Store, Pos> for RItem {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult {
+        match self {
+            RItem::Fn {span, vis, val} => val.execute(store, engine, id),
+        }
+        return Ok(true);
+    }
+}
+
+impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> Execute<Store, Pos> for RFn{
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult {
+        pather::new_engine(engine);
+        let id = engine.len() - 1;
+        for arg in &self.args {
+            arg.execute(store, engine, id)?;
+        }
+        self.body.execute(store, engine, id)?;
+        return Ok(true);
+    }
+}
+impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> Execute<Store, Pos> for RBlock{
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult {
+        for stmt in &self.statements {
+            stmt.execute(store, engine, id)?;
+        }
+        return Ok(true);
+    }
+}
+
+impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> Execute<Store, Pos> for RStatement{
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult {
+       use RStatement::*; 
+       match self {
+        Comment{comment} => comment.execute(store, engine, id),
+        Expr {expr, semi} => expr.execute(store, engine, id),
+        Return {return_span, expr, semi} => {expr.execute(store, engine, id); return Ok(false)},
+        SColon {semi} => (),
+        If {stmt} => stmt.execute(store, engine, id),
+        Loop {stmt} => stmt.execute(store, engine, id),
+        Assign {ident, ty, equal_value,..} => {engine[id].assign_symvar_value(equal_value.into_string(store), ident.into_string(store));}
+       }
+    }
+}
+
+
+impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> Execute<Store, Pos> for RParam{
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult {
+        engine[id].new_variable(self.id.into_string(store), self.ty.into_string(store));
+    }
+}
 
 pub trait IntoLisp<Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> {
     fn into_lisp(&self, store: &Store) -> String;

@@ -3,11 +3,17 @@ mod compiler;
 mod symex;
 
 use std::env;
+use std::fs;
 //use equation_solver::*;
 use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
 use crate::symex::{SymVar, SymExEngine};
+use crate::parser::*;
+use crate::parser::parser::parse_file;
 
-static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
+//use parse_file;
+use ParseResult::*;
+
+//static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -15,11 +21,13 @@ fn main() {
         println!("File name expected");
         return;
     }
-    println!("{}", &args[1]);
+    let filename = args[1].clone();
 
-    let valid = compiler::compile_input(&args[1]);
+
+    let valid = compiler::compile_input(&filename);
         if valid {
-            println!("Hello World!");
+           run_parser(filename);
+
         }
 
         else {
@@ -27,6 +35,18 @@ fn main() {
         }
 }
 
+fn run_parser(filename: String) {
+
+    let t = fs::read_to_string(filename).expect("Could not read");
+    let text = t.as_str();
+    match parse_file(text) {
+        Okay(value, advance) => {
+            println!("{}: {:?}", advance, value);
+        },
+        Error(error) => panic!("Error: {}", error),
+        Panic(error) => panic!("Panic: {}", error),
+    }
+}
 
 #[cfg(test)] 
 mod test {
