@@ -1,5 +1,4 @@
 fn main() {
-    return 0;
 }
 
 fn b_algebra(mut x:i32, mut y:i32) -> u8 {

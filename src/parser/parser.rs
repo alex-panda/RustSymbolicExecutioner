@@ -89,6 +89,37 @@ impl ParseStore<PPos, char> for &str {
     }
 }
 
+pub trait IntoLisp<Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> {
+    fn into_lisp(&self, store: &Store) -> String;
+}
+
+impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> IntoLisp<Store, Pos> for Span<Pos> {
+    fn into_lisp(&self, store: &Store) -> String {
+        self.into_string(store)
+    }
+}
+
+impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos, T: IntoLisp<Store, Pos> + ?Sized> IntoLisp<Store, Pos> for Box<T> {
+    fn into_lisp(&self, store: &Store) -> String {
+        (**self).into_lisp(store)
+    }
+}
+
+impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos, T: IntoLisp<Store, Pos>> IntoLisp<Store, Pos> for Vec<T> {
+    fn into_lisp(&self, store: &Store) -> String {
+        let mut out = String::new();
+        if self.len() > 0 {
+            out.extend(self[0].into_lisp(store).chars());
+
+            for i in 1..self.len() {
+                out.push(' ');
+                out.extend(self[i].into_lisp(store).chars());
+            }
+        }
+        out
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RParam {
     pub mutable: Option<Span<PPos>>,
@@ -180,11 +211,45 @@ pub enum RExpr {
     BinOp { left: Box<RExpr>, op: BinOp, op_span: Span<PPos>, right: Box<RExpr> },
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Whitespace {
-    Comment(RComment),
-    Blank(Span<PPos>),
+
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RExpr {
+    fn into_lisp(&self, store: &Store) -> String {
+        match self {
+            RExpr::Lit(l) => l.into_lisp(store),
+            RExpr::Var(v) => v.into_lisp(store),
+            RExpr::Path(_) => format!("Path"),
+            RExpr::Block(_) => format!("Block"),
+            RExpr::If(_) => format!("IfStatement"),
+            RExpr::Loop(_) => format!("Loop"),
+            RExpr::Call { ident, args } => {
+                format!("({} {})", ident.into_lisp(store), args.into_lisp(store))
+            },
+            RExpr::Deref { expr, .. } => {
+                format!("*{}", expr.into_lisp(store))
+            },
+            RExpr::Borrow { expr, .. } => {
+                format!("&{}", expr.into_lisp(store))
+            },
+            RExpr::BorrowMut { expr, .. } => {
+                format!("&{}", expr.into_lisp(store))
+            },
+            RExpr::Negate { expr, .. } => {
+                format!("-{}", expr.into_lisp(store))
+            },
+            RExpr::Not { expr, .. } => {
+                format!("!{}", expr.into_lisp(store))
+            },
+            RExpr::AssignOp { left, op, op_span, right } => {
+                format!("(setq {} {})", left.into_lisp(store), right.into_lisp(store))
+            },
+            RExpr::BinOp { left, op, op_span, right } => {
+                format!("({} {} {})", op.into_lisp(store), left.into_lisp(store), right.into_lisp(store))
+            },
+        }
+    }
 }
+
+
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BinOp {
@@ -216,6 +281,38 @@ pub enum BinOp {
     Mul,
 }
 
+impl AsRef<str> for BinOp {
+    fn as_ref(&self) -> &str {
+        match self.clone() {
+            BinOp::As => "as",
+            BinOp::EqEq => "==",
+            BinOp::NotEq => "!=",
+            BinOp::LessThan => "<",
+            BinOp::MoreThan => ">",
+            BinOp::LessThanEq => "<=",
+            BinOp::MoreThanEq => ">=",
+            BinOp::And => "&&",
+            BinOp::Or => "||",
+            BinOp::LSh => "<<",
+            BinOp::RSh => ">>",
+            BinOp::BitAnd => "&",
+            BinOp::BitOr => "|",
+            BinOp::BitXOr => "^",
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Div => "/",
+            BinOp::Mod => "%",
+            BinOp::Mul => "*",
+        }
+    }
+}
+
+impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> IntoLisp<Store, Pos> for BinOp {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.as_ref())
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum AssignOp {
     // Assignment
@@ -232,6 +329,30 @@ pub enum AssignOp {
     AXOr,
     ALSh,
     ARSh,
+}
+
+impl AsRef<str> for AssignOp {
+    fn as_ref(&self) -> &str {
+        match self.clone() {
+            AssignOp::Assign => "=",
+            AssignOp::AAdd => "+=",
+            AssignOp::ASub => "-=",
+            AssignOp::AMul => "*=",
+            AssignOp::ADiv => "/=",
+            AssignOp::AMod => "%=",
+            AssignOp::AAnd => "&=",
+            AssignOp::AOr => "|=",
+            AssignOp::AXOr => "^=",
+            AssignOp::ALSh => "<<=",
+            AssignOp::ARSh => ">>=",
+        }
+    }
+}
+
+impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> IntoLisp<Store, Pos> for AssignOp {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.as_ref())
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -349,6 +470,13 @@ pub enum RComment {
     },
 }
 
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Whitespace {
+    Comment(RComment),
+    Blank(Span<PPos>),
+}
+
 // -- Literals --
 
 ///
@@ -365,6 +493,22 @@ pub enum RLit {
     Integer(RIntLit),
     Float(RFloatLit),
     Bool(RBoolLit),
+}
+
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        match self {
+            RLit::Char(c) => c.into_lisp(store),
+            RLit::String(s) => s.into_lisp(store),
+            RLit::RawString(s) => s.into_lisp(store),
+            RLit::Byte(b) => b.into_lisp(store),
+            RLit::ByteString(b) => b.into_lisp(store),
+            RLit::RawByteString(b) => b.into_lisp(store),
+            RLit::Integer(i) => i.into_lisp(store),
+            RLit::Float(f) => f.into_lisp(store),
+            RLit::Bool(b) => b.into_lisp(store),
+        }
+    }
 }
 
 // --- Crate ---
@@ -470,11 +614,27 @@ pub enum RBoolLit {
     False { span: Span<PPos> }
 }
 
+impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> IntoLisp<Store, Pos> for RBoolLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        use RBoolLit::*;
+        match self {
+            True { .. } => format!("true"),
+            False { .. } => format!("false"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RCharLit {
     pub span: Span<PPos>,
     pub value: Span<PPos>,
     pub suffix: Option<Span<PPos>>,
+}
+
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RCharLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        self.span.into_lisp(store)
+    }
 }
 
 /// 
@@ -487,11 +647,23 @@ pub struct RStrLit {
     pub suffix: Option<Span<PPos>>,
 }
 
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RStrLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.span.into_lisp(store))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RByteStrLit {
     pub span: Span<PPos>,
     pub value: Span<PPos>,
     pub suffix: Option<Span<PPos>>,
+}
+
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RByteStrLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.span.into_lisp(store))
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -501,11 +673,23 @@ pub struct RRawByteStrLit {
     pub suffix: Option<Span<PPos>>,
 }
 
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RRawByteStrLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.text.into_lisp(store))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RByteLit {
     pub span: Span<PPos>,
     pub value: Span<PPos>,
     pub suffix: Option<Span<PPos>>
+}
+
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RByteLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.value.into_lisp(store))
+    }
 }
 
 /// 
@@ -519,6 +703,12 @@ pub struct RRawStrLit {
     pub suffix: Option<Span<PPos>>,
 }
 
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RRawStrLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.span.into_lisp(store))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RFloatLit {
     pub span: Span<PPos>,
@@ -528,11 +718,23 @@ pub struct RFloatLit {
     pub suffix: Option<Span<PPos>>
 }
 
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RFloatLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.span.into_lisp(store))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RSFloatLit {
     pub span: Span<PPos>,
     pub neg: bool,
     pub lit: RFloatLit,
+}
+
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RSFloatLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.span.into_lisp(store))
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -541,10 +743,22 @@ pub struct RDecLit {
     pub value: Span<PPos>,
 }
 
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RDecLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.span.into_lisp(store))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RBinLit {
     pub span: Span<PPos>,
     pub value: Span<PPos>,
+}
+
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RBinLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.span.into_lisp(store))
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -553,10 +767,22 @@ pub struct ROctLit {
     pub value: Span<PPos>,
 }
 
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for ROctLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.span.into_lisp(store))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RHexLit {
     pub span: Span<PPos>,
     pub value: Span<PPos>,
+}
+
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RHexLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        format!("{}", self.span.into_lisp(store))
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -581,6 +807,17 @@ pub enum RIntLit {
         lit: RHexLit,
         suffix: Option<Span<PPos>>,
     },
+}
+
+impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RIntLit {
+    fn into_lisp(&self, store: &Store) -> String {
+        match self {
+            RIntLit::DecLit { lit, .. } => lit.into_lisp(store),
+            RIntLit::BinLit { lit, .. } => lit.into_lisp(store),
+            RIntLit::OctLit { lit, .. } => lit.into_lisp(store),
+            RIntLit::HexLit { lit, .. } => lit.into_lisp(store),
+        }
+    }
 }
 
 use ParseResult::*;
