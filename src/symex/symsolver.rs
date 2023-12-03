@@ -108,5 +108,4 @@ mod tests {
         let is_sat = s.check_sat()?;
         assert!(is_sat);
     }
-
 }
