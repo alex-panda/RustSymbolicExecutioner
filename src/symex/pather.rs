@@ -61,7 +61,7 @@ mod tests {
         engines[1].new_variable_assign("y".to_string(), "u64".to_string(), "5 + 6".to_string());
         engines[1].assign_symvar_value("x + 4".to_string(), "x".to_string());
         engines[1].assign_symvar_value("x * 2".to_string(), "y".to_string());
-        new_assert(&mut engines, 1, "y = 18".to_string());
+        new_assert(&mut engines, 1, "y == 18".to_string());
     
         let is_sat = engines[2].pi.s.check_sat()?;
         println!("{}", engines[2].to_string());
