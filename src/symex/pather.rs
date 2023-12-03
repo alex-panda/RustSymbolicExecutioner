@@ -3,7 +3,7 @@ use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort}
 use crate::symex::{SymVar, SymSolver, SymExEngine};
 use std::ops::Deref;
 
-fn new_engine(engines: &mut Vec<SymExEngine>) {
+pub fn new_engine(engines: &mut Vec<SymExEngine>) {
     let mut init_engine = || -> Result<(), Box<dyn std::error::Error>> {
         let mut e = SymExEngine {
             pi: SymSolver::new(),
@@ -18,7 +18,7 @@ fn new_engine(engines: &mut Vec<SymExEngine>) {
     }
 }
 
-fn clone_engine(engines: &mut Vec<SymExEngine>, path: usize) {
+pub fn clone_engine(engines: &mut Vec<SymExEngine>, path: usize) {
     let mut init_engine = || -> Result<(), Box<dyn std::error::Error>> {
         let mut e = SymExEngine {
             pi: SymSolver::copy_solver(&engines[path].pi),

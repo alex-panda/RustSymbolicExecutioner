@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{parser::{AnyOf6, ParseContext, OneOf, Not, AnyV, Funnel5, Funnel4, AnyMemTable, Funnel6, Join, Mem, Funnel2, AnyOf10, OneOf9, AnyOf9, OneOf8, MapPValue, Funnel9, LRJoin, Trace, Funnel10, Never, Funnel3, Funnel7, Funnel8, Funnel11, AnyOf8, OneOf11, AnyOf11, RLJoin, Funnel12, DPrint}, srule};
+use crate::{parser::{AnyOf6, ParseContext, OneOf, Not, AnyV, Funnel5, Funnel4, AnyMemTable, Funnel6, Join, Mem, Funnel2, AnyOf10, OneOf9, AnyOf9, OneOf8, MapPValue, Funnel9, LRJoin, Trace, Funnel10, Never, Funnel3, Funnel7, Funnel8, Funnel11, AnyOf8, OneOf11, AnyOf11, RLJoin, Funnel12, DPrint}, srule, symex::{SymExEngine, self}};
 
 use super::{ParseResult, Span, ZeroOrMore, ParseNode, SpanOf, Map, OneOf3, Spanned, OneOrMore, AnyOf3, Maybe, AnyOf2, MapV, OneOf6, SRule, Leader, Surround, End, Req, OneOf5, AnyOf5, AnyOf4, OneOf4, OneOf2, ParsePos, ParseStore};
 
@@ -88,69 +88,165 @@ impl ParseStore<PPos, char> for &str {
         (**self).value_at(pos)
     }
 }
-type ReturnResult = Result<bool, ()>;
 
-pub trait Execute<Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult;
+type ExErr = ();
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ExOk {
+    pub cont: bool,
+    pub res: Vec<SymexRes>,
 }
 
-impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> Execute<Store, Pos> for RCrate{
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct SymexRes {
+    symex_pos: Span<PPos>,
+    res: String,
+}
+
+type ReturnResult = Result<ExOk, ExErr>;
+
+pub trait Execute<Store: ParseStore<PPos, char> + ?Sized> {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr>;
+}
+
+impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RCrate {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
+        let mut results = Vec::new();
         for item in self.items.iter() {
-            item.execute(store, engine, id)?;
+            let res = item.execute(store, engine, id)?;
+            results.extend(res.res);
         }
-        return Ok(true);
+        Ok(ExOk { cont: true, res: results })
     }
 }
 
-impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> Execute<Store, Pos> for RItem {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult {
+impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RItem {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
         match self {
             RItem::Fn {span, vis, val} => val.execute(store, engine, id),
         }
-        return Ok(true);
     }
 }
 
-impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> Execute<Store, Pos> for RFn{
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult {
-        pather::new_engine(engine);
+impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RFn {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
+        symex::new_engine(engine);
         let id = engine.len() - 1;
+        // add the params
         for arg in &self.args {
             arg.execute(store, engine, id)?;
         }
-        self.body.execute(store, engine, id)?;
-        return Ok(true);
+        // executet he body now that we have the params
+        self.body.execute(store, engine, id)
     }
 }
-impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> Execute<Store, Pos> for RBlock{
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult {
+impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RBlock {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
+        let mut results = Vec::new();
         for stmt in &self.statements {
-            stmt.execute(store, engine, id)?;
+            let res = stmt.execute(store, engine, id)?;
+            results.extend(res.res);
+            if !res.cont {
+                break;
+            }
         }
-        return Ok(true);
+        return Ok(ExOk { cont: true, res: results });
     }
 }
 
-impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> Execute<Store, Pos> for RStatement{
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult {
-       use RStatement::*; 
-       match self {
-        Comment{comment} => comment.execute(store, engine, id),
-        Expr {expr, semi} => expr.execute(store, engine, id),
-        Return {return_span, expr, semi} => {expr.execute(store, engine, id); return Ok(false)},
-        SColon {semi} => (),
-        If {stmt} => stmt.execute(store, engine, id),
-        Loop {stmt} => stmt.execute(store, engine, id),
-        Assign {ident, ty, equal_value,..} => {engine[id].assign_symvar_value(equal_value.into_string(store), ident.into_string(store));}
-       }
+impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RStatement {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
+        use RStatement::*; 
+        match self {
+            Comment{comment} => {
+                match comment {
+                    RComment::Symex { symex, .. } => {
+                        let mut vec = Vec::new();
+                        vec.push(SymexRes {
+                            symex_pos: symex.clone(),
+                            res: engine[id].to_string()
+                        });
+                        return Ok(ExOk { cont: true, res: vec });
+                    },
+                    _ => Ok(ExOk { cont: true, res: Vec::new() }),
+                }
+            },
+            Expr {expr, semi} => expr.execute(store, engine, id),
+            Return {return_span, expr, semi} => {
+                let mut res = expr.execute(store, engine, id)?;
+                res.cont = false;
+                Ok(res)
+            },
+            SColon {semi} => Ok(ExOk { cont: true, res: Vec::new() }),
+            If {stmt} => stmt.execute(store, engine, id),
+            Loop {stmt} => stmt.execute(store, engine, id),
+            Assign {ident, ty, equal_value,..} => {
+                engine[id].new_variable_assign(
+                    ident.into_string(store),
+                    ty.clone().map(|v|v.into_string(store)).unwrap_or_else(||"i32".to_string()),
+                    equal_value.span().into_string(store)
+                );
+
+                Ok(ExOk { cont: true, res: Vec::new() })
+            }
+        }
+
+
     }
 }
 
 
-impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> Execute<Store, Pos> for RParam{
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> ReturnResult {
+impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RParam {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
         engine[id].new_variable(self.id.into_string(store), self.ty.into_string(store));
+        return Ok(ExOk { cont: true, res: Vec::new() });
+    }
+}
+
+impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RExpr {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
+        use RExpr::*;
+        match self {
+            Lit(_) => {},
+            Var(_) => {},
+            Path(_, _) => {},
+            Block(b) => return b.execute(store, engine, id),
+            If(i) => return i.execute(store, engine, id),
+            Loop(l) => return l.execute(store, engine, id),
+            Call { span, ident, args } => {},
+            Deref { span, star, expr } => {},
+            Borrow { span, and, expr } => {},
+            BorrowMut { span, and, mutable, expr } => {},
+            Negate { span, neg, expr } => {},
+            Not { span, not, expr } => {},
+            AssignOp { span, left, op, op_span, right } => {
+                engine[id].assign_symvar_value(
+                    left.span().into_string(store),
+                    right.span().into_string(store)
+                );
+            },
+            BinOp { span, left, op, op_span, right } => {},
+        }       
+        Ok(ExOk { cont: true, res: Vec::new() })
+    }
+}
+
+impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RIf {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
+        match self {
+            RIf::If { span, prev, expr, block } => {
+            },
+            RIf::Else { span, prev, block } => {
+
+            },
+        }
+        Ok(ExOk { cont: true, res: Vec::new() })
+    }
+}
+
+impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RLoop {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
+        Ok(ExOk { cont: true, res: Vec::new() })
     }
 }
 
@@ -194,7 +290,8 @@ pub struct RParam {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RBlock {
-    pub statements: Vec<RStatement>
+    pub span: Span<PPos>,
+    pub statements: Vec<RStatement>,
 }
 
 /// 
@@ -203,6 +300,7 @@ pub struct RBlock {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RIf {
     If {
+        span: Span<PPos>,
         /// The previous if statement (if there is one) in the chain of if
         /// statements. Only if its expression returns `false` can this if
         /// statement check its own expression.
@@ -213,30 +311,56 @@ pub enum RIf {
         block: RBlock
     },
     Else {
+        span: Span<PPos>,
         prev: Box<RIf>,
         block: RBlock,
     }
 }
 
+impl RIf {
+    pub fn span(&self) -> Span<PPos> {
+        use RIf::*;
+        match self {
+            If { span, .. } => span.clone(),
+            Else { span, .. } => span.clone(),
+        }
+    } 
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RLoop {
     Infinite {
+        span: Span<PPos>,
         block: RBlock,
     },
     While {
+        span: Span<PPos>,
         expr: RExpr,
         block: RBlock,
     },
     For {
+        span: Span<PPos>,
         var: Span<PPos>,
         expr: RExpr,
         block: RBlock,
     },
 }
 
+impl RLoop {
+    pub fn span(&self) -> Span<PPos> {
+        use RLoop::*;
+        match self {
+            Infinite { span, .. } => span.clone(),
+            While { span, .. } => span.clone(),
+            For { span, .. } => span.clone(),
+        }
+    } 
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RType {
     Array {
+        span: Span<PPos>,
         /// The type of every item in the array (since arrays can only hold 1
         /// type of item, this is that type).
         item_type: Box<Self>,
@@ -244,10 +368,12 @@ pub enum RType {
         item_number: PPos,
     },
     Tuple {
+        span: Span<PPos>,
         /// The types in the tuple, stored in the same order as given.
         types: Vec<Self>,
     },
     Template {
+        span: Span<PPos>,
         /// The name of the type.
         name: Span<PPos>,
         /// The arguments for the type.
@@ -255,25 +381,57 @@ pub enum RType {
     },
 }
 
+impl RType {
+    pub fn into_string<Store: ParseStore<PPos, char> + ?Sized>(&self, store: &Store) -> String {
+        match self {
+            RType::Array { span, .. } => span.into_string(store),
+            RType::Tuple { span, .. } => span.into_string(store),
+            RType::Template { span, .. } => span.into_string(store),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RExpr {
     Lit(RLit),
     Var(Span<PPos>),
-    Path(Vec<Span<PPos>>),
+    Path(Span<PPos>, Vec<Span<PPos>>),
     Block(RBlock),
     If(Box<RIf>),
     Loop(Box<RLoop>),
 
-    Call { ident: Span<PPos>, args: Vec<RExpr> },
+    Call      { span: Span<PPos>, ident: Span<PPos>, args: Vec<RExpr> },
 
-    Deref { star: Span<PPos>, expr: Box<RExpr> },
-    Borrow { and: Span<PPos>, expr: Box<RExpr> },
-    BorrowMut { and: Span<PPos>, mutable: Span<PPos>, expr: Box<RExpr> },
-    Negate { neg: Span<PPos>, expr: Box<RExpr> },
-    Not { not: Span<PPos>, expr: Box<RExpr> },
+    Deref     { span: Span<PPos>, star: Span<PPos>, expr: Box<RExpr> },
+    Borrow    { span: Span<PPos>, and: Span<PPos>, expr: Box<RExpr> },
+    BorrowMut { span: Span<PPos>, and: Span<PPos>, mutable: Span<PPos>, expr: Box<RExpr> },
+    Negate    { span: Span<PPos>, neg: Span<PPos>, expr: Box<RExpr> },
+    Not       { span: Span<PPos>, not: Span<PPos>, expr: Box<RExpr> },
 
-    AssignOp { left: Box<RExpr>, op: AssignOp, op_span: Span<PPos>, right: Box<RExpr> },
-    BinOp { left: Box<RExpr>, op: BinOp, op_span: Span<PPos>, right: Box<RExpr> },
+    AssignOp  { span: Span<PPos>, left: Box<RExpr>, op: AssignOp, op_span: Span<PPos>, right: Box<RExpr> },
+    BinOp     { span: Span<PPos>, left: Box<RExpr>, op: BinOp, op_span: Span<PPos>, right: Box<RExpr> },
+}
+
+impl RExpr {
+    pub fn span(&self) -> Span<PPos> {
+        use RExpr::*;
+        match self {
+            Lit(l) => l.span(),
+            Var(v) => v.clone(),
+            Path(p, _) => p.clone(),
+            Block(b) => b.span.clone(),
+            If(f) => f.span().clone(),
+            Loop(l) => l.span().clone(),
+            Call { span, .. } => span.clone(),
+            Deref { span, .. } => span.clone(),
+            Borrow { span, .. } => span.clone(),
+            BorrowMut { span, .. } => span.clone(),
+            Negate { span, .. } => span.clone(),
+            Not { span, .. } => span.clone(),
+            AssignOp { span, .. } => span.clone(),
+            BinOp { span, .. } => span.clone(),
+        }
+    }
 }
 
 
@@ -282,11 +440,11 @@ impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RExpr {
         match self {
             RExpr::Lit(l) => l.into_lisp(store),
             RExpr::Var(v) => v.into_lisp(store),
-            RExpr::Path(_) => format!("Path"),
+            RExpr::Path(span, _) => span.into_lisp(store),
             RExpr::Block(_) => format!("Block"),
             RExpr::If(_) => format!("IfStatement"),
             RExpr::Loop(_) => format!("Loop"),
-            RExpr::Call { ident, args } => {
+            RExpr::Call { ident, args, .. } => {
                 format!("({} {})", ident.into_lisp(store), args.into_lisp(store))
             },
             RExpr::Deref { expr, .. } => {
@@ -304,10 +462,10 @@ impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RExpr {
             RExpr::Not { expr, .. } => {
                 format!("!{}", expr.into_lisp(store))
             },
-            RExpr::AssignOp { left, op, op_span, right } => {
+            RExpr::AssignOp { left, op, op_span, right, .. } => {
                 format!("(setq {} {})", left.into_lisp(store), right.into_lisp(store))
             },
-            RExpr::BinOp { left, op, op_span, right } => {
+            RExpr::BinOp { left, op, op_span, right, .. } => {
                 format!("({} {} {})", op.into_lisp(store), left.into_lisp(store), right.into_lisp(store))
             },
         }
@@ -560,6 +718,23 @@ pub enum RLit {
     Bool(RBoolLit),
 }
 
+impl RLit {
+    pub fn span(&self) -> Span<PPos> {
+        use RLit::*;
+        match self {
+            Char(s) => s.span.clone(),
+            String(s) => s.span.clone(),
+            RawString(s) => s.span.clone(),
+            Byte(s) => s.span.clone(),
+            ByteString(s) => s.span.clone(),
+            RawByteString(s) => s.span.clone(),
+            Integer(s) => s.span(),
+            Float(s) => s.span.clone(),
+            Bool(s) => s.span(),
+        }
+    }
+}
+
 impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RLit {
     fn into_lisp(&self, store: &Store) -> String {
         match self {
@@ -677,6 +852,16 @@ pub enum RVis {
 pub enum RBoolLit {
     True  { span: Span<PPos> },
     False { span: Span<PPos> }
+}
+
+impl RBoolLit {
+    pub fn span(&self) -> Span<PPos> {
+        use RBoolLit::*;
+        match self {
+            True { span } => span.clone(),
+            False { span } => span.clone(),
+        }
+    }
 }
 
 impl <Store: ParseStore<Pos, char> + ?Sized, Pos: ParsePos> IntoLisp<Store, Pos> for RBoolLit {
@@ -872,6 +1057,18 @@ pub enum RIntLit {
         lit: RHexLit,
         suffix: Option<Span<PPos>>,
     },
+}
+
+impl RIntLit {
+    pub fn span(&self) -> Span<PPos> {
+        use RIntLit::*;
+        match self {
+            DecLit { span, .. } => span.clone(),
+            BinLit { span, .. } => span.clone(),
+            OctLit { span, .. } => span.clone(),
+            HexLit { span, .. } => span.clone(),
+        }
+    }
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RIntLit {
@@ -1496,20 +1693,21 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
         assign_rule.set(
             RLJoin(logic_op, (w, OneOf11('=', "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="), w),
-                |left, (_, op, _), right| {
+                |left: RExpr, (_, op, _), right| {
+                    let span = Span::new(left.span().start, right.span().end);
                     use AnyOf11::*;
                     match op {
-                        Child1(op_span) => AssignOp { left: Box::new(left), op: Assign, op_span, right: Box::new(right) },
-                        Child2(op_span) => AssignOp { left: Box::new(left), op: AAdd, op_span, right: Box::new(right) },
-                        Child3(op_span) => AssignOp { left: Box::new(left), op: ASub, op_span, right: Box::new(right) },
-                        Child4(op_span) => AssignOp { left: Box::new(left), op: AMul, op_span, right: Box::new(right) },
-                        Child5(op_span) => AssignOp { left: Box::new(left), op: ADiv, op_span, right: Box::new(right) },
-                        Child6(op_span) => AssignOp { left: Box::new(left), op: AMod, op_span, right: Box::new(right) },
-                        Child7(op_span) => AssignOp { left: Box::new(left), op: AAnd, op_span, right: Box::new(right) },
-                        Child8(op_span) => AssignOp { left: Box::new(left), op: AOr, op_span, right: Box::new(right) },
-                        Child9(op_span) => AssignOp { left: Box::new(left), op: AXOr, op_span, right: Box::new(right) },
-                        Child10(op_span) => AssignOp { left: Box::new(left), op: ALSh, op_span, right: Box::new(right) },
-                        Child11(op_span) => AssignOp { left: Box::new(left), op: ARSh, op_span, right: Box::new(right) },
+                        Child1(op_span) => AssignOp { span, left: Box::new(left), op: Assign, op_span, right: Box::new(right) },
+                        Child2(op_span) => AssignOp { span, left: Box::new(left), op: AAdd, op_span, right: Box::new(right) },
+                        Child3(op_span) => AssignOp { span, left: Box::new(left), op: ASub, op_span, right: Box::new(right) },
+                        Child4(op_span) => AssignOp { span, left: Box::new(left), op: AMul, op_span, right: Box::new(right) },
+                        Child5(op_span) => AssignOp { span, left: Box::new(left), op: ADiv, op_span, right: Box::new(right) },
+                        Child6(op_span) => AssignOp { span, left: Box::new(left), op: AMod, op_span, right: Box::new(right) },
+                        Child7(op_span) => AssignOp { span, left: Box::new(left), op: AAnd, op_span, right: Box::new(right) },
+                        Child8(op_span) => AssignOp { span, left: Box::new(left), op: AOr, op_span, right: Box::new(right) },
+                        Child9(op_span) => AssignOp { span, left: Box::new(left), op: AXOr, op_span, right: Box::new(right) },
+                        Child10(op_span) => AssignOp { span, left: Box::new(left), op: ALSh, op_span, right: Box::new(right) },
+                        Child11(op_span) => AssignOp { span, left: Box::new(left), op: ARSh, op_span, right: Box::new(right) },
                     }
                 }
             )
@@ -1517,17 +1715,18 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
         logic_op_rule.set(
             LRJoin(add_or_sub, (w, OneOf8("&&", "||", "==", "!=", "<=", ">=", "<", ">"), w),
-                |left, (_, op, _), right| {
+                |left: RExpr, (_, op, _), right| {
+                    let span = Span::new(left.span().start, right.span().end);
                     use AnyOf8::*;
                     match op {
-                        Child1(op_span) => BinOp { left: Box::new(left), op: And       , op_span, right: Box::new(right) },
-                        Child2(op_span) => BinOp { left: Box::new(left), op: Or        , op_span, right: Box::new(right) },
-                        Child3(op_span) => BinOp { left: Box::new(left), op: EqEq      , op_span, right: Box::new(right) },
-                        Child4(op_span) => BinOp { left: Box::new(left), op: NotEq     , op_span, right: Box::new(right) },
-                        Child5(op_span) => BinOp { left: Box::new(left), op: LessThanEq, op_span, right: Box::new(right) },
-                        Child6(op_span) => BinOp { left: Box::new(left), op: MoreThanEq, op_span, right: Box::new(right) },
-                        Child7(op_span) => BinOp { left: Box::new(left), op: LessThan  , op_span, right: Box::new(right) },
-                        Child8(op_span) => BinOp { left: Box::new(left), op: MoreThan  , op_span, right: Box::new(right) },
+                        Child1(op_span) => BinOp { span, left: Box::new(left), op: And       , op_span, right: Box::new(right) },
+                        Child2(op_span) => BinOp { span, left: Box::new(left), op: Or        , op_span, right: Box::new(right) },
+                        Child3(op_span) => BinOp { span, left: Box::new(left), op: EqEq      , op_span, right: Box::new(right) },
+                        Child4(op_span) => BinOp { span, left: Box::new(left), op: NotEq     , op_span, right: Box::new(right) },
+                        Child5(op_span) => BinOp { span, left: Box::new(left), op: LessThanEq, op_span, right: Box::new(right) },
+                        Child6(op_span) => BinOp { span, left: Box::new(left), op: MoreThanEq, op_span, right: Box::new(right) },
+                        Child7(op_span) => BinOp { span, left: Box::new(left), op: LessThan  , op_span, right: Box::new(right) },
+                        Child8(op_span) => BinOp { span, left: Box::new(left), op: MoreThan  , op_span, right: Box::new(right) },
                     }
                 }
             )
@@ -1535,45 +1734,48 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
         add_or_sub_rule.set(
             LRJoin(mul_or_div, (w, OneOf2('+', '-'), w),
-            |left, (_, op, _), right| {
+            |left: RExpr, (_, op, _), right| {
+                let span = Span::new(left.span().start, right.span().end);
                 match op {
-                    AnyOf2::Child1(op_span) => BinOp { left: Box::new(left), op: Add, op_span, right: Box::new(right) },
-                    AnyOf2::Child2(op_span) => BinOp { left: Box::new(left), op: Sub, op_span, right: Box::new(right) },
+                    AnyOf2::Child1(op_span) => BinOp { span, left: Box::new(left), op: Add, op_span, right: Box::new(right) },
+                    AnyOf2::Child2(op_span) => BinOp { span, left: Box::new(left), op: Sub, op_span, right: Box::new(right) },
                 }
             })
         );
 
         mul_or_div_rule.set(
             LRJoin(power, (w, OneOf3('*', '/', '%'), w),
-            |left, (_, op, _), right| {
+            |left: RExpr, (_, op, _), right| {
+                let span = Span::new(left.span().start, right.span().end);
                 match op {
-                    AnyOf3::Child1(op_span) => BinOp { left: Box::new(left), op: Mul, op_span, right: Box::new(right) },
-                    AnyOf3::Child2(op_span) => BinOp { left: Box::new(left), op: Div, op_span, right: Box::new(right) },
-                    AnyOf3::Child3(op_span) => BinOp { left: Box::new(left), op: Mod, op_span, right: Box::new(right) },
+                    AnyOf3::Child1(op_span) => BinOp { span, left: Box::new(left), op: Mul, op_span, right: Box::new(right) },
+                    AnyOf3::Child2(op_span) => BinOp { span, left: Box::new(left), op: Div, op_span, right: Box::new(right) },
+                    AnyOf3::Child3(op_span) => BinOp { span, left: Box::new(left), op: Mod, op_span, right: Box::new(right) },
                 }
             })
         );
 
         power_rule.set(
             LRJoin(value, (w, '^', w),
-            |left, (_, op_span, _), right| {
-                BinOp { left: Box::new(left), op: BitXOr, op_span, right: Box::new(right) }
+            |left: RExpr, (_, op_span, _), right| {
+                let span = Span::new(left.span().start, right.span().end);
+                BinOp { span, left: Box::new(left), op: BitXOr, op_span, right: Box::new(right) }
             })
         );
 
         value_rule.set(
             Funnel12(
-                MapV(('!', w, expr), |(not, _, expr)| RExpr::Not { not, expr: Box::new(expr) }),
-                MapV(('*', w, expr), |(star, _, expr)| RExpr::Deref { star, expr: Box::new(expr) }),
-                MapV(('&', w, "mut", w, expr), |(and, _, mutable, _, expr)| RExpr::BorrowMut { and, mutable, expr: Box::new(expr) }),
-                MapV(('&', w, expr), |(and, _, expr)| RExpr::Borrow { and, expr: Box::new(expr) }),
-                MapV(('-', w, expr), |(neg, _, expr)| RExpr::Negate { neg, expr: Box::new(expr) }),
+                MapV(Spanned(('!', w, expr)), |(span, (not, _, expr))| RExpr::Not { span, not, expr: Box::new(expr) }),
+                MapV(Spanned(('*', w, expr)), |(span, (star, _, expr))| RExpr::Deref { span, star, expr: Box::new(expr) }),
+                MapV(Spanned(('&', w, "mut", w, expr)), |(span, (and, _, mutable, _, expr))| RExpr::BorrowMut { span, and, mutable, expr: Box::new(expr) }),
+                MapV(Spanned(('&', w, expr)), |(span, (and, _, expr))| RExpr::Borrow { span, and, expr: Box::new(expr) }),
+                MapV(Spanned(('-', w, expr)), |(span, (neg, _, expr))| RExpr::Negate { span, neg, expr: Box::new(expr) }),
                 MapV(block, |group| RExpr::Block(group)),
-                MapV(('(', w, expr, w, ')'), |(_, _, e, _, _)| e),
+                MapV(Spanned(('(', w, expr, w, ')')), |(span, (_, _, e, _, _))| e),
                 MapV(literal_expression, |lit| RExpr::Lit(lit)),
                 MapV(if_statement, |if_| RExpr::If(Box::new(if_))),
                 MapV(loop_statement, |loop_| RExpr::Loop(Box::new(loop_))),
-                MapV((ident, '(', w, Join(expr, (w, ',', w)), Maybe((w, ',', w)), w, ')'), |(ident, _, _, args, _, _, _)| RExpr::Call { ident, args }),
+                MapV(Spanned((ident, '(', w, Join(expr, (w, ',', w)), Maybe((w, ',', w)), w, ')')), |(span, (ident, _, _, args, _, _, _))| RExpr::Call { span, ident, args }),
                 MapV(ident, |span| RExpr::Var(span)),
             ),
         );
@@ -1581,15 +1783,16 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
     block_rule.set(
         MapV(
-            Surround(
+            Spanned(Surround(
                     '{',
                         (w, ZeroOrMore((statement, w)), Maybe((expr, w))),
                     '}',
                     |_, _, e| e,
                     |_, ocbrace_span, _, _| panic(ocbrace_span, "block", "openning curly brace is missing its complementary closing curly brace to end the scope"),
-                ),
-            |(_lcbrace, (w, statements, expr), _rcbrace)| {
+                )),
+            |(span, (_lcbrace, (w, statements, expr), _rcbrace))| {
                 RBlock {
+                    span,
                     statements: {
                         let mut stmts: Vec<RStatement> = Vec::new();
                         for wh in w {
@@ -1619,7 +1822,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
     type_tuple_rule.set(
         MapV(
-            Surround(
+            Spanned(Surround(
                 '(',
                     (
                         w,
@@ -1628,15 +1831,15 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
                 ')',
                 |_, _, e| e,
                 |_, oparen_span, _, _| panic(oparen_span, "type_tuple", "missing closing parenthesis after this open parenthesis"),
-            ),
-            |(_, (_, maybe_types), _)| {
+            )),
+            |(span, (_, (_, maybe_types), _))| {
                 match maybe_types {
                     Some((t1, _, types)) => {
                         let mut types: Vec<RType> = types.into_iter().map(|v|v.2).collect();
                         types.insert(0, t1);
-                        RType::Tuple { types }
+                        RType::Tuple { span, types }
                     },
-                    None => RType::Tuple { types: Vec::new() },
+                    None => RType::Tuple { span, types: Vec::new() },
                 }
             }
         )
@@ -1644,7 +1847,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
     ty_rule.set(
         MapV(
-            OneOf2(
+            Spanned(OneOf2(
                 type_tuple,
                 (
                     ident,
@@ -1662,14 +1865,15 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
                         )
                     ))
                 )
-            ),
-            |any_of_two| {
+            )),
+            |(span, any_of_two)| {
                 match any_of_two {
                     AnyOf2::Child1(ty) => {
                         ty
                     },
                     AnyOf2::Child2((ident, args)) => {
                         RType::Template {
+                            span,
                             name: ident,
                             args: match args {
                                 Some((_, (_, (_, args), _))) => {
@@ -1753,33 +1957,34 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         ),
     );
 
-    if_statement_rule.set(MapV(Leader(
+    if_statement_rule.set(MapV(Spanned(Leader(
             "if", (w, expr, w, block,
                 Maybe((w, Leader("else", (w, OneOf2(block, if_statement)),
                     |_, pos, _| panic(pos, "if_statement", "expected code block after this \"else\"")
                 )))
             ),
             |_, pos, _| panic(pos, "if_statement", "expected expression and body of the if statement after this \"if\" keyword")
-        ),
-        |(_, (_, expr, _, block, maybe_else))| {
-            let iff = RIf::If { prev: None, expr, block };
+        )),
+        |(span, (_, (_, expr, _, block, maybe_else)))| {
+            let iff = RIf::If { span: span.clone(), prev: None, expr, block };
 
             if let Some((_, (_, (_, choice)))) = maybe_else {
                 use AnyOf2::*;
                 match choice {
                     Child1(block) => {
                         RIf::Else {
+                            span,
                             prev: Box::new(iff),
                             block,
                         }
                     },
                     Child2(if_stmt) => {
                         match if_stmt {
-                            RIf::If { prev: _, expr, block } => {
-                                RIf::If { prev: Some(Box::new(iff)), expr, block }
+                            RIf::If { span, prev: _, expr, block } => {
+                                RIf::If { span, prev: Some(Box::new(iff)), expr, block }
                             },
-                            RIf::Else { prev: _, block } => { 
-                                RIf::Else { prev: Box::new(iff), block }
+                            RIf::Else { span, prev: _, block } => { 
+                                RIf::Else { span, prev: Box::new(iff), block }
                              }
                         }
                     },
@@ -1797,18 +2002,18 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     infinite_loop_rule.set(MapV(
-        ("loop", w, block),
-        |(_, _, block)| RLoop::Infinite { block }
+        Spanned(("loop", w, block)),
+        |(span, (_, _, block))| RLoop::Infinite { span, block }
     ));
 
     while_loop_rule.set(MapV(
-        ("while", w, expr, w, block),
-        |(_, _, expr, _, block)| RLoop::While { expr, block }
+        Spanned(("while", w, expr, w, block)),
+        |(span, (_, _, expr, _, block))| RLoop::While { span, expr, block }
     ));
 
     for_loop_rule.set(MapV(
-        ("for", w, ident, w, "in", w, expr, w, block),
-        |(_, _, var, _, _, _, expr, _, block)| RLoop::For { var, expr, block }
+        Spanned(("for", w, ident, w, "in", w, expr, w, block)),
+        |(span, (_, _, var, _, _, _, expr, _, block))| RLoop::For { span, var, expr, block }
     ));
 
     // --- Function ---
@@ -1907,7 +2112,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::parser::{RCrate, RFn};
+    use crate::parser::parser::{RCrate, RFn, Execute};
 
     use super::parse_file;
     use super::super::ParseResult;
@@ -2119,6 +2324,27 @@ fn b_infLoop(n: i64) -> i64 {
         match parse_file(test) {
             Okay(value, advance) => {
                 println!("{}: {:?}", advance, value);
+            },
+            Error(error) => panic!("Error: {}", error),
+            Panic(error) => panic!("Panic: {}", error),
+        }
+    }
+
+    #[test]
+    fn test_symex() {
+        let s = "
+fn s_algebra(mut x:i32, mut y:i32) -> i32 {
+    x = y + 4;
+    y = 2*x; 
+    let mut w = (x*4) + y;
+    //symex - what are the possible values?
+    return w;
+}
+";
+        match parse_file(s) {
+            Okay(value, _) => {
+                let mut engine = Vec::new();
+                println!("{:?}", value.execute(s, &mut engine, 0));
             },
             Error(error) => panic!("Error: {}", error),
             Panic(error) => panic!("Panic: {}", error),

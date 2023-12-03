@@ -9,18 +9,17 @@ pub struct SymExEngine {
 }
 
 pub fn eval(stmt_rs: String) -> String {
-    let mut new = "".to_string();
     let n = Equation::new(stmt_rs.clone());
-    let mut eq = n.unwrap();
+    let eq = n.unwrap();
 
     let wrap_result = eq.evaluate();
     
     let eval = match wrap_result {
-        Ok(f64) => new = wrap_result.unwrap().to_string(),
-        Err(EquationError) => new = stmt_rs.clone(),
+        Ok(_) => wrap_result.unwrap().to_string(), // f64
+        Err(_) => stmt_rs.clone(), // EquationError
     };
 
-    return new;
+    return eval;
 }
 
 
