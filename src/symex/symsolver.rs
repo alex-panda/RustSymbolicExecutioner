@@ -8,12 +8,6 @@ pub struct SymSolver {
     assert_str: String,
 }
 
-//TODO update to actually generate LISP
-pub fn format_assertion(assert: &String) -> String {
-    let mut lisp = "(= 5 5)".to_string();
-    println!("{}", lisp); //debugging
-    return lisp;
-}
 
 impl SymSolver {
     pub fn new() -> Self {
@@ -55,9 +49,13 @@ impl SymSolver {
         }
     }
     pub fn add_assertion_to_solver(&mut self, assert: &String) {
-        let fmt_assert = format_assertion(assert);
-        self.s.assert(fmt_assert.clone()).unwrap();
-        self.assert_str = format!("{}#{}", self.assert_str, fmt_assert.clone());
+        println!("asserting {}", assert.clone());
+        self.s.assert(assert.clone()).unwrap();
+        self.assert_str = format!("{}#{}", self.assert_str, assert.clone());
+        let is_sat = self.s.check_sat().unwrap();
+        if !is_sat {
+            self.assert_str = format!("{}#{}", self.assert_str, "Path assertions not valid");
+        }
     }
     pub fn load_solver(&self) -> Solver<()> {
         let mut s = SmtConf::z3(PATH_TO_SOLVER).spawn(()).unwrap();

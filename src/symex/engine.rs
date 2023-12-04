@@ -10,7 +10,7 @@ pub struct SymExEngine {
 
 pub fn eval(stmt_rs: String) -> String {
     let stmt_clean = stmt_rs.replace(";", "");
-    println!("eval {}", stmt_clean);
+    //println!("eval {}", stmt_clean);
     let n = Equation::new(stmt_clean.clone());
 
     let mut eq = n.unwrap();
@@ -97,12 +97,12 @@ impl SymExEngine {
         }
     }
 
-    pub fn new_assertion(&mut self, a: String) {
+    pub fn new_assertion(&mut self, a: String, lisp: String) {
         let assert = a.replace(";", "");
         let var0_assert = self.display_as_var0(assert.clone());
         let and_assert = " && ".to_owned() + &var0_assert;
         self.pi.add_assertion_to_pi_str(&and_assert);
-        self.pi.add_assertion_to_solver(&assert);
+        self.pi.add_assertion_to_solver(&lisp);
     }
 
 
@@ -125,27 +125,5 @@ mod tests {
     use equation_solver::*;
     static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
 
-    #[test]
-    fn demo_engine() {
-        let init_engine = || -> Result<(), Box<dyn std::error::Error>> {
-            let mut e = SymExEngine {
-                pi: SymSolver::new(),
-                sigma: Vec::new(),
-                path: 1,
-            };
-            //demonstration of updating sigma using predetermined variables and assignments
-            e.new_variable("x".to_string(), "i32".to_string());
-            e.new_variable_assign("y".to_string(), "u64".to_string(), "5 + 6".to_string());
-            e.assign_symvar_value("x + 4".to_string(), "x".to_string());
-            e.assign_symvar_value("x * 2".to_string(), "y".to_string());
 
-            //println!("{}", e.to_string());
-
-            Ok(())
-        };
-    
-        if let Err(_err) = init_engine() {
-            println!("Failed to initialize symbolic execution engine.");
-        }
-    }
 }
