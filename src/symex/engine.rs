@@ -114,7 +114,7 @@ impl SymExEngine {
             temp = temp - 1;
         }
 
-        println!("{}", self.to_string());
+        //println!("{}", self.to_string());
 
     }
 }

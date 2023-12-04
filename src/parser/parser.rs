@@ -2335,8 +2335,9 @@ fn b_infLoop(n: i64) -> i64 {
         let s = "
 fn s_algebra(mut x:i32, mut y:i32) -> i32 {
     x = y + 4;
+    //symex
     y = 2*x + 1; 
-    let w = x + 4/ y;
+    let w = ((x + 4))/ y;
     //symex - what are the possible values?
     return w;
 }
