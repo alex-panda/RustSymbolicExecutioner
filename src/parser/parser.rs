@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{parser::{AnyOf6, ParseContext, OneOf, Not, AnyV, Funnel5, Funnel4, AnyMemTable, Funnel6, Join, Mem, Funnel2, AnyOf10, OneOf9, AnyOf9, OneOf8, MapPValue, Funnel9, LRJoin, Trace, Funnel10, Never, Funnel3, Funnel7, Funnel8, Funnel11, AnyOf8, OneOf11, AnyOf11, RLJoin, Funnel12, DPrint}, srule, symex::{SymExEngine, self}};
+use crate::{parser::{AnyOf6, ParseContext, OneOf, Not, AnyV, Funnel5, Funnel4, AnyMemTable, Funnel6, Join, Mem, Funnel2, AnyOf10, OneOf9, AnyOf9, OneOf8, MapPValue, Funnel9, LRJoin, Trace, Funnel10, Never, Funnel3, Funnel7, Funnel8, Funnel11, AnyOf8, OneOf11, AnyOf11, RLJoin, Funnel12, DPrint}, srule, symex::{SymExEngine, self, new_assert}};
 
 use super::{ParseResult, Span, ZeroOrMore, ParseNode, SpanOf, Map, OneOf3, Spanned, OneOrMore, AnyOf3, Maybe, AnyOf2, MapV, OneOf6, SRule, Leader, Surround, End, Req, OneOf5, AnyOf5, AnyOf4, OneOf4, OneOf2, ParsePos, ParseStore};
 
@@ -235,13 +235,23 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RExpr {
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RIf {
     fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
         match self {
-            RIf::If { span, prev, expr, block } => {
-            },
-            RIf::Else { span, prev, block } => {
+            RIf::If { prev, expr, block, .. } => {
+                let mut res = ExOk { cont: true, res: Vec::new() };
 
+                if let Some(prev) = prev {
+                    res = prev.execute(store, engine, id)?;
+                }
+
+                let path_id = new_assert(engine, id, expr.span().into_lisp(store));
+                res.res.extend(block.execute(store, engine, path_id)?.res);
+                Ok(res)
+            },
+            RIf::Else { prev, block, .. } => {
+                let mut res = prev.execute(store, engine, id)?;
+                res.res.extend(block.execute(store, engine, id)?.res);
+                Ok(res)
             },
         }
-        Ok(ExOk { cont: true, res: Vec::new() })
     }
 }
 
@@ -440,36 +450,37 @@ impl RExpr {
 
 impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RExpr {
     fn into_lisp(&self, store: &Store) -> String {
+        use RExpr::*;
         match self {
-            RExpr::Lit(l) => l.into_lisp(store),
-            RExpr::Var(v) => v.into_lisp(store),
-            RExpr::Path(span, _) => span.into_lisp(store),
-            RExpr::Block(_) => format!("Block"),
-            RExpr::If(_) => format!("IfStatement"),
-            RExpr::Loop(_) => format!("Loop"),
-            RExpr::Group { expr, .. } => expr.into_lisp(store),
-            RExpr::Call { ident, args, .. } => {
+            Lit(l) => l.into_lisp(store),
+            Var(v) => v.into_lisp(store),
+            Path(span, _) => span.into_lisp(store),
+            Block(_) => format!("Block"),
+            If(_) => format!("IfStatement"),
+            Loop(_) => format!("Loop"),
+            Group { expr, .. } => expr.into_lisp(store),
+            Call { ident, args, .. } => {
                 format!("({} {})", ident.into_lisp(store), args.into_lisp(store))
             },
-            RExpr::Deref { expr, .. } => {
+            Deref { expr, .. } => {
                 format!("*{}", expr.into_lisp(store))
             },
-            RExpr::Borrow { expr, .. } => {
+            Borrow { expr, .. } => {
                 format!("&{}", expr.into_lisp(store))
             },
-            RExpr::BorrowMut { expr, .. } => {
+            BorrowMut { expr, .. } => {
                 format!("&{}", expr.into_lisp(store))
             },
-            RExpr::Negate { expr, .. } => {
+            Negate { expr, .. } => {
                 format!("-{}", expr.into_lisp(store))
             },
-            RExpr::Not { expr, .. } => {
+            Not { expr, .. } => {
                 format!("!{}", expr.into_lisp(store))
             },
-            RExpr::AssignOp { left, op, op_span, right, .. } => {
+            AssignOp { left, op, op_span, right, .. } => {
                 format!("(setq {} {})", left.into_lisp(store), right.into_lisp(store))
             },
-            RExpr::BinOp { left, op, op_span, right, .. } => {
+            BinOp { left, op, op_span, right, .. } => {
                 format!("({} {} {})", op.into_lisp(store), left.into_lisp(store), right.into_lisp(store))
             },
         }
@@ -2293,41 +2304,44 @@ fn s2_ifStmt(mut x:i32, mut y:i32) -> i32 {
     return x;
 }
 
-fn s_loop(n: i64) -> i64 {
-    let mut i: i64 = 0;
-    let mut j: i64 = 1;
-    while i < n {
-        j = j * 2;
-        i = i + 1;
-    }
-    //symex - what is the value of i
-	return i;
-}
-
-fn b_loop(n: i64) -> i64 {
-    let mut i: i64 = 0;
-    let mut j: i64 = 1;
-    while i <= n {
-        j = j * 2;
-        i = i + 1;
-    }
-    //symex - what is the value of i
-	return i;
-}
-
-fn b_infLoop(n: i64) -> i64 {
-    let mut i = 0;
-    let mut j = 1;
-    while i < n {
-        j = j * 2;
-    }
-	return i;
-}
+//fn s_loop(n: i64) -> i64 {
+//    let mut i: i64 = 0;
+//    let mut j: i64 = 1;
+//    while i < n {
+//        j = j * 2;
+//        i = i + 1;
+//    }
+//    //symex - what is the value of i
+//	return i;
+//}
+//
+//fn b_loop(n: i64) -> i64 {
+//    let mut i: i64 = 0;
+//    let mut j: i64 = 1;
+//    while i <= n {
+//        j = j * 2;
+//        i = i + 1;
+//    }
+//    //symex - what is the value of i
+//	return i;
+//}
+//
+//fn b_infLoop(n: i64) -> i64 {
+//    let mut i = 0;
+//    let mut j = 1;
+//    while i < n {
+//        j = j * 2;
+//    }
+//	return i;
+//}
         ";
 
         match parse_file(test) {
             Okay(value, advance) => {
-                println!("{}: {:?}", advance, value);
+                //println!("{}: {:?}", advance, value);
+                let mut engine = Vec::new();
+                println!("{:?}", value);
+                println!("{:?}", value.execute(test, &mut engine, 0));
             },
             Error(error) => panic!("Error: {}", error),
             Panic(error) => panic!("Panic: {}", error),

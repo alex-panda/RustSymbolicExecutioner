@@ -34,12 +34,13 @@ pub fn clone_engine(engines: &mut Vec<SymExEngine>, path: usize) {
 }
 
 
-pub fn new_assert(e: &mut Vec<SymExEngine>, path: usize, assert: String) {
+pub fn new_assert(e: &mut Vec<SymExEngine>, path: usize, assert: String) -> usize {
     let l = e.len();
     clone_engine(e, path);
     e[path].new_assertion(assert.clone());
     let neg_assert = "!".to_owned() + &assert.clone();
     e[l].new_assertion(neg_assert.clone());
+    l
 }
 
 #[cfg(test)]
