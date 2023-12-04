@@ -41,7 +41,8 @@ fn run_parser(filename: String) {
     let text = t.as_str();
     match parse_file(text) {
         Okay(value, advance) => {
-            println!("{}: {:?}", advance, value);
+            let mut engine = Vec::new();
+            println!("{:?}", value.execute(text, &mut engine, 0));
         },
         Error(error) => panic!("Error: {}", error),
         Panic(error) => panic!("Panic: {}", error),

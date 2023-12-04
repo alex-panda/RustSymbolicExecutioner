@@ -9,7 +9,8 @@ pub struct SymExEngine {
 }
 
 pub fn eval(stmt_rs: String) -> String {
-    let n = Equation::new(stmt_rs.clone());
+    let stmt_clean = stmt_rs.replace(";", "");
+    let n = Equation::new(stmt_clean.clone());
     let eq = n.unwrap();
 
     let wrap_result = eq.evaluate();
@@ -52,7 +53,7 @@ impl SymExEngine {
     }
 
     pub fn display_as_var0(&mut self, mut st: String) -> String {
-        let mut stmt = st.clone();
+        let mut stmt = st.replace(";", "");
         let mut i = 0;
         while i < self.sigma.len() {
             let f = &self.sigma[i].name.eq(&self.sigma[i].var0);
@@ -86,7 +87,8 @@ impl SymExEngine {
         }
     }
 
-    pub fn new_assertion(&mut self, assert: String) {
+    pub fn new_assertion(&mut self, a: String) {
+        let assert = a.replace(";", "");
         let var0_assert = self.display_as_var0(assert.clone());
         let and_assert = " && ".to_owned() + &var0_assert;
         self.pi.add_assertion_to_pi_str(&and_assert);
