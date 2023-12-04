@@ -241,8 +241,8 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RIf {
                 if let Some(prev) = prev {
                     res = prev.execute(store, engine, id)?;
                 }
-
-                let path_id = new_assert(engine, id, expr.span().into_string(store), expr.span().into_lisp(store));
+                println!("{}",expr.into_lisp(store));
+                let path_id = new_assert(engine, id, expr.span().into_string(store), expr.into_lisp(store));
                 println!("{}", path_id);
                 res.res.extend(block.execute(store, engine, path_id)?.res);
                 Ok(res)
@@ -451,39 +451,61 @@ impl RExpr {
 
 impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RExpr {
     fn into_lisp(&self, store: &Store) -> String {
-        use RExpr::*;
+        //use RExpr::*;
         match self {
-            Lit(l) => l.into_lisp(store),
-            Var(v) => v.into_lisp(store),
-            Path(span, _) => span.into_lisp(store),
-            Block(_) => format!("Block"),
-            If(_) => format!("IfStatement"),
-            Loop(_) => format!("Loop"),
-            Group { expr, .. } => expr.into_lisp(store),
-            Call { ident, args, .. } => {
+            RExpr::Lit(l) => l.into_lisp(store),
+            RExpr::Var(v) => v.into_lisp(store),
+            RExpr::Path(span, _) => span.into_lisp(store),
+            RExpr::Block(_) => format!("Block"),
+            RExpr::If(_) => format!("IfStatement"),
+            RExpr::Loop(_) => format!("Loop"),
+            RExpr::Group { expr, .. } => expr.into_lisp(store),
+            RExpr::Call { ident, args, .. } => {
                 format!("({} {})", ident.into_lisp(store), args.into_lisp(store))
             },
-            Deref { expr, .. } => {
+            RExpr::Deref { expr, .. } => {
                 format!("*{}", expr.into_lisp(store))
             },
-            Borrow { expr, .. } => {
+            RExpr::Borrow { expr, .. } => {
                 format!("&{}", expr.into_lisp(store))
             },
-            BorrowMut { expr, .. } => {
+            RExpr::BorrowMut { expr, .. } => {
                 format!("&{}", expr.into_lisp(store))
             },
-            Negate { expr, .. } => {
+            RExpr::Negate { expr, .. } => {
                 format!("-{}", expr.into_lisp(store))
             },
-            Not { expr, .. } => {
+            RExpr::Not { expr, .. } => {
                 format!("!{}", expr.into_lisp(store))
             },
-            AssignOp { left, op, op_span, right, .. } => {
+            RExpr::AssignOp { left, op, op_span, right, .. } => {
                 format!("(setq {} {})", left.into_lisp(store), right.into_lisp(store))
             },
-            BinOp { left, op, op_span, right, .. } => {
-                format!("({} {} {})", op.into_lisp(store), left.into_lisp(store), right.into_lisp(store))
+            RExpr::BinOp { left, op, op_span, right, .. } => {
+                let op = match op {
+                    BinOp::As => "as",
+                    BinOp::EqEq => "=",
+                    BinOp::NotEq => return format!("(not (= {} {}))", left.into_lisp(store), right.into_lisp(store)),
+                    BinOp::LessThan => "<",
+                    BinOp::MoreThan => ">",
+                    BinOp::LessThanEq => "<=",
+                    BinOp::MoreThanEq => ">=",
+                    BinOp::And => "&&",
+                    BinOp::Or => "||",
+                    BinOp::LSh => "<<",
+                    BinOp::RSh => ">>",
+                    BinOp::BitAnd => "&",
+                    BinOp::BitOr => "|",
+                    BinOp::BitXOr => "^",
+                    BinOp::Add => "+",
+                    BinOp::Sub => "-",
+                    BinOp::Div => "/",
+                    BinOp::Mod => "%",
+                    BinOp::Mul => "*",
+                };
+                format!("({} {} {})", op.to_string(), left.into_lisp(store), right.into_lisp(store))
             },
+    
         }
     }
 }
@@ -524,8 +546,8 @@ impl AsRef<str> for BinOp {
     fn as_ref(&self) -> &str {
         match self.clone() {
             BinOp::As => "as",
-            BinOp::EqEq => "==",
-            BinOp::NotEq => "!=",
+            BinOp::EqEq => "=",
+            BinOp::NotEq => "/=",
             BinOp::LessThan => "<",
             BinOp::MoreThan => ">",
             BinOp::LessThanEq => "<=",
@@ -2354,11 +2376,11 @@ fn s2_ifStmt(mut x:i32, mut y:i32) -> i32 {
         let s = "
 fn s_if(mut x:i32, mut y:i32) -> i32 {
     x = y * 2;
-    if x = 5 {
+    if x == 5 {
         y = y + 3;
     }
 
-    if y = 6 {
+    if y != 6 {
         x = 5;
     }
     
