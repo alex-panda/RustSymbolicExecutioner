@@ -5,21 +5,21 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 /// 
 /// Returns a node that will parse one or more of its first child as long as
 /// each consecutive parse of its first child has a successful parse of its
-/// second child between it and the previous successfull parse of the first
-/// child. Every two parses of the first child are combined, from right to left,
+/// second child between it and the previous parse. Every two parses of the
+/// first child are combined, from right to left,
 /// into a single result using the given function. As such, this node will
-/// return only a single result that is the same type as that which its first
+/// return only a single result that is of the same type as that which its first
 /// child produces. If, instead, you would like a list of joined results without
 /// a function congealing them into a single result, use the `Join` node instead.
 /// 
 /// One reason to use this node would be to create a right-recursive AST without
 /// right recursion. For example, `RLJoin(expr, '+', |left, _, right| Expr::Add { left, right })`
 /// will parse one or more expressions so long as each expression has a `'+'`
-/// between it and the previous one. Then, the node will pass the right-most
+/// between it and the previous one. Then, the node will pass the second right-most
 /// result in as the first argument of the given function, the `'+'` result as the
-/// second argument of the given function, and the second right-most child in as the third
+/// second argument of the given function, and the right-most child in as the third
 /// argument of the function. What the function returns will then be considered
-/// the right-most result and the process will repeat again until there is only
+/// the right-most result of the parse and the process will repeat again until there is only
 /// one child.
 /// 
 /// ```{text}
@@ -41,8 +41,10 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 /// 
 /// Empty AST
 /// 
-/// Then, after one call of the function, the result looks like this (`Add` is what was returned by the function and it is only mentally marked (in truth it is just an `Expr` type like everything else)):
+/// Then, after one call of the function, the result looks like this (`Add` is the AST node that was returned by the function):
 /// vec![expr1, expr2, Add]
+/// 
+/// Where Add is
 /// 
 ///     Add
 ///     / \

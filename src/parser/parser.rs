@@ -172,12 +172,12 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RStatement {
                 }
             },
             Expr {expr, semi} => expr.execute(store, engine, id),
-            Return {return_span, expr, semi} => {
+            Return { expr, .. } => {
                 let mut res = expr.execute(store, engine, id)?;
                 res.cont = false;
                 Ok(res)
             },
-            SColon {semi} => Ok(ExOk { cont: true, res: Vec::new() }),
+            SColon { .. } => Ok(ExOk { cont: true, res: Vec::new() }),
             If {stmt} => stmt.execute(store, engine, id),
             Loop {stmt} => stmt.execute(store, engine, id),
             Assign {ident, ty, equal_value,..} => {
@@ -210,6 +210,7 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RExpr {
             Lit(_) => {},
             Var(_) => {},
             Path(_, _) => {},
+            Group { expr, .. } => return expr.execute(store, engine, id),
             Block(b) => return b.execute(store, engine, id),
             If(i) => return i.execute(store, engine, id),
             Loop(l) => return l.execute(store, engine, id),
@@ -399,6 +400,7 @@ pub enum RExpr {
     Block(RBlock),
     If(Box<RIf>),
     Loop(Box<RLoop>),
+    Group { span: Span<PPos>, expr: Box<RExpr> },
 
     Call      { span: Span<PPos>, ident: Span<PPos>, args: Vec<RExpr> },
 
@@ -419,6 +421,7 @@ impl RExpr {
             Lit(l) => l.span(),
             Var(v) => v.clone(),
             Path(p, _) => p.clone(),
+            Group { span, .. } => span.clone(),
             Block(b) => b.span.clone(),
             If(f) => f.span().clone(),
             Loop(l) => l.span().clone(),
@@ -444,6 +447,7 @@ impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RExpr {
             RExpr::Block(_) => format!("Block"),
             RExpr::If(_) => format!("IfStatement"),
             RExpr::Loop(_) => format!("Loop"),
+            RExpr::Group { expr, .. } => expr.into_lisp(store),
             RExpr::Call { ident, args, .. } => {
                 format!("({} {})", ident.into_lisp(store), args.into_lisp(store))
             },
@@ -1771,7 +1775,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
                 MapV(Spanned(('&', w, expr)), |(span, (and, _, expr))| RExpr::Borrow { span, and, expr: Box::new(expr) }),
                 MapV(Spanned(('-', w, expr)), |(span, (neg, _, expr))| RExpr::Negate { span, neg, expr: Box::new(expr) }),
                 MapV(block, |group| RExpr::Block(group)),
-                MapV(Spanned(('(', w, expr, w, ')')), |(span, (_, _, e, _, _))| e),
+                MapV(Spanned(('(', w, expr, w, ')')), |(span, (_, _, e, _, _))| RExpr::Group { span, expr: Box::new(e) }),
                 MapV(literal_expression, |lit| RExpr::Lit(lit)),
                 MapV(if_statement, |if_| RExpr::If(Box::new(if_))),
                 MapV(loop_statement, |loop_| RExpr::Loop(Box::new(loop_))),
@@ -2345,6 +2349,7 @@ fn s_algebra(mut x:i32, mut y:i32) -> i32 {
         match parse_file(s) {
             Okay(value, _) => {
                 let mut engine = Vec::new();
+                println!("{:?}", value);
                 println!("{:?}", value.execute(s, &mut engine, 0));
             },
             Error(error) => panic!("Error: {}", error),
