@@ -10,7 +10,7 @@ pub struct SymExEngine {
 
 pub fn eval(stmt_rs: String) -> String {
     let stmt_clean = stmt_rs.replace(";", "");
-    println!("{}", stmt_clean);
+    println!("eval {}", stmt_clean);
     let n = Equation::new(stmt_clean.clone());
 
     let mut eq = n.unwrap();
@@ -50,7 +50,9 @@ impl SymExEngine {
     //creates symvar from initialization
     //ie let var_name: var_type = assign;
     pub fn new_variable_assign(&mut self, var_name: String, var_type: String, assign: String) {
-        let v = SymVar::new_assign(var_name.clone(), var_type.clone(), eval(assign.clone()));
+        let a = assign.replace(";", "");
+        let stmt = self.display_as_var0(a);
+        let v = SymVar::new_assign(var_name.clone(), var_type.clone(), eval(stmt.clone()));
         //println!("created {} of type {} with value {}", var_name.clone(), var_type.clone(), assign.clone());
         self.sigma.push(v);
         self.pi.add_int(var_name.clone())
@@ -67,10 +69,12 @@ impl SymExEngine {
             }
             else if *f {
                 let s = format!("{}", self.sigma[i].var0);
+                //println!("{}", stmt);
                 stmt = stmt.replace(&self.sigma[i].name, &s);
             }
             i = i + 1;
         }
+        
         return stmt;
     }
 
@@ -84,6 +88,7 @@ impl SymExEngine {
                 found = true;
                 self.sigma[j].prev = self.sigma[j].var0.clone();
                 self.sigma[j].var0 = eval(stmt_rs.clone());
+                self.sort_symvar(j);
             }
             j = j + 1;
         }
@@ -98,6 +103,19 @@ impl SymExEngine {
         let and_assert = " && ".to_owned() + &var0_assert;
         self.pi.add_assertion_to_pi_str(&and_assert);
         self.pi.add_assertion_to_solver(&assert);
+    }
+
+
+    pub fn sort_symvar(&mut self, i: usize) {
+        let mut temp= i;
+
+        while temp > 0 {
+            self.sigma.swap(temp, temp - 1);
+            temp = temp - 1;
+        }
+
+        println!("{}", self.to_string());
+
     }
 }
 
