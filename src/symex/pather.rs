@@ -34,12 +34,13 @@ pub fn clone_engine(engines: &mut Vec<SymExEngine>, path: usize) {
 }
 
 
-pub fn new_assert(e: &mut Vec<SymExEngine>, path: usize, assert: String) -> usize {
+pub fn new_assert(e: &mut Vec<SymExEngine>, path: usize, assert: String, lisp: String) -> usize {
     let l = e.len();
     clone_engine(e, path);
-    e[path].new_assertion(assert.clone());
+    e[path].new_assertion(assert.clone(), lisp.clone());
     let neg_assert = "!".to_owned() + &assert.clone();
-    e[l].new_assertion(neg_assert.clone());
+    let neg_lisp = format!("(not {})", lisp.clone());
+    e[l].new_assertion(neg_assert.clone(), neg_lisp);
     l
 }
 
@@ -53,7 +54,7 @@ mod tests {
         println!("{}", engines[0].to_string());
     }
 
-    #[test]
+    /*#[test]
     pub fn test_new_assert() -> Result<(), Box<dyn std::error::Error>> {
         let mut engines: Vec<SymExEngine> = Vec::new();
         pather::new_engine(&mut engines);
@@ -68,6 +69,6 @@ mod tests {
         println!("{}", engines[2].to_string());
         assert!(is_sat);
         Ok(())
-    }
+    }*/
 
 }

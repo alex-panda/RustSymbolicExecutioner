@@ -242,7 +242,8 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RIf {
                     res = prev.execute(store, engine, id)?;
                 }
 
-                let path_id = new_assert(engine, id, expr.span().into_lisp(store));
+                let path_id = new_assert(engine, id, expr.span().into_string(store), expr.span().into_lisp(store));
+                println!("{}", path_id);
                 res.res.extend(block.execute(store, engine, path_id)?.res);
                 Ok(res)
             },
@@ -2351,13 +2352,17 @@ fn s2_ifStmt(mut x:i32, mut y:i32) -> i32 {
     #[test]
     fn test_symex() {
         let s = "
-fn s_algebra(mut x:i32, mut y:i32) -> i32 {
-    x = y + 4;
+fn s_if(mut x:i32, mut y:i32) -> i32 {
+    x = y * 2;
+    if x = 5 {
+        y = y + 3;
+    }
+
+    if y = 6 {
+        x = 5;
+    }
+    
     //symex
-    y = 2*x + 1; 
-    let w = ((x + 4))/ y;
-    //symex - what are the possible values?
-    return w;
 }
 ";
         match parse_file(s) {
