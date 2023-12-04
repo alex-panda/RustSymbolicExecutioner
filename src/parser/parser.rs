@@ -221,8 +221,8 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RExpr {
             Not { span, not, expr } => {},
             AssignOp { span, left, op, op_span, right } => {
                 engine[id].assign_symvar_value(
-                    left.span().into_string(store),
-                    right.span().into_string(store)
+                    right.span().into_string(store),
+                    left.span().into_string(store)
                 );
             },
             BinOp { span, left, op, op_span, right } => {},
@@ -2335,10 +2335,10 @@ fn b_infLoop(n: i64) -> i64 {
         let s = "
 fn s_algebra(mut x:i32, mut y:i32) -> i32 {
     x = y + 4;
-    y = 2*x; 
-    let mut w = (x*4) + y;
+    y = 2*x + 1; 
+    x = (x + 4)/ y;
     //symex - what are the possible values?
-    return w;
+    return x;
 }
 ";
         match parse_file(s) {

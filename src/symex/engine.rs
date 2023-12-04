@@ -10,14 +10,16 @@ pub struct SymExEngine {
 
 pub fn eval(stmt_rs: String) -> String {
     let stmt_clean = stmt_rs.replace(";", "");
+    println!("{}", stmt_clean);
     let n = Equation::new(stmt_clean.clone());
-    let eq = n.unwrap();
+
+    let mut eq = n.unwrap();
 
     let wrap_result = eq.evaluate();
     
     let eval = match wrap_result {
         Ok(_) => wrap_result.unwrap().to_string(), // f64
-        Err(_) => stmt_rs.clone(), // EquationError
+        Err(_) => stmt_clean.clone(), // EquationError
     };
 
     return eval;
@@ -39,7 +41,8 @@ impl SymExEngine {
     //creates symvar from function header
 //ie (mut var_name: var_type)
     pub fn new_variable(&mut self, var_name: String, var_type: String) {
-        let v = SymVar::new(var_name.clone(), var_type);
+        let v = SymVar::new(var_name.clone(), var_type.clone());
+        //println!("created {} of type {}", var_name.clone(), var_type.clone());
         self.sigma.push(v);
         self.pi.add_int(var_name.clone());
     }
@@ -47,7 +50,8 @@ impl SymExEngine {
     //creates symvar from initialization
     //ie let var_name: var_type = assign;
     pub fn new_variable_assign(&mut self, var_name: String, var_type: String, assign: String) {
-        let v = SymVar::new_assign(var_name.clone(), var_type, eval(assign));
+        let v = SymVar::new_assign(var_name.clone(), var_type.clone(), eval(assign.clone()));
+        //println!("created {} of type {} with value {}", var_name.clone(), var_type.clone(), assign.clone());
         self.sigma.push(v);
         self.pi.add_int(var_name.clone())
     }
@@ -71,6 +75,7 @@ impl SymExEngine {
     }
 
     pub fn assign_symvar_value(&mut self, mut stmt_rs: String, stmt_ls: String) {
+        //println!("{} = {}", stmt_ls.clone(), stmt_rs.clone());
         stmt_rs = self.display_as_var0(stmt_rs);
         let mut j = 0;
         let mut found = false;
@@ -116,7 +121,7 @@ mod tests {
             e.assign_symvar_value("x + 4".to_string(), "x".to_string());
             e.assign_symvar_value("x * 2".to_string(), "y".to_string());
 
-            println!("{}", e.to_string());
+            //println!("{}", e.to_string());
 
             Ok(())
         };
