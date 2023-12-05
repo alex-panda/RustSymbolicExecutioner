@@ -33,7 +33,10 @@ macro_rules! srule {
 }
 
 /// 
-/// A stack rule i.e. a `Rule` that lives on the stack.
+/// Returns a node that that allows its child to be set later, after its
+/// creation. Using this node, as well as through the use of immutable
+/// references to this node, recursive parse trees can be created completely on
+/// the stack.
 /// 
 #[allow(non_snake_case)]
 #[inline]

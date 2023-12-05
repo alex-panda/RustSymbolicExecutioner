@@ -2,6 +2,11 @@ use crate::parser::{ExpectedEndError, ParseContext};
 
 use super::super::{ParseValue, ParseStore, ParsePos, ParseNode, ParseResult};
 
+/// 
+/// Returns a node that only parses successfully if there is not parse value at
+/// the current position (i.e. we are at or past the end of the material being
+/// parsed).
+/// 
 #[allow(non_snake_case)]
 pub fn End() -> EndNode {
     EndNode

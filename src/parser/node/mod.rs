@@ -58,9 +58,6 @@ pub use weak::*;
 mod mapv;
 pub use mapv::*;
 
-mod value_set;
-pub use value_set::*;
-
 mod one_of;
 pub use one_of::*;
 

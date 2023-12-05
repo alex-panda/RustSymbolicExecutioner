@@ -2,12 +2,11 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 
 
 /// 
-/// A node that requires its child to parse successfully and returns
-/// `ParseResult::Panic` if it does not.
-/// 
-/// Returns a node that requires its child to parse successfully, mapping the
-/// childs `ParseResult::Error` to a `ParseResult::Panic` using the given
-/// function if the child fails to parse.
+/// Returns a node that requires its child to parse successfully at the
+/// current parse position. If the child fails to parse, then the given function
+/// is called to get a value of type `Err`. The `Err` value is then
+/// wrapped in a `ParseResult::Panic(..)` variant and returned, ending the
+/// parse entirely.
 /// 
 #[allow(non_snake_case)]
 pub fn Req<Child: ParseNode<Ok, Err, Store, Pos, V>, F: Fn(&Store, Pos, Err) -> Err, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(child: Child, f: F) -> ReqNode<Child, F, Ok, Err, Store, Pos, V> {

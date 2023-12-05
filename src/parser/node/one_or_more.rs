@@ -2,6 +2,12 @@ use crate::parser::{ZSTNode, Span, ParseContext};
 
 use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult, NoAdvanceError, FailedFirstParseError};
 
+/// 
+/// Returns a child node that tries to parse its child node one or more times
+/// starting from the current parse position, failing only if the child node
+/// fails its first parse. Otherwise, this node returns a vector of all
+/// successfull child node parse results.
+/// 
 #[allow(non_snake_case)]
 pub fn OneOrMore<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(child: Child) -> OneOrMoreNode<Child, Ok, Err, Store, Pos, V> {
     OneOrMoreNode { child, _zst: ZSTNode::default(), }

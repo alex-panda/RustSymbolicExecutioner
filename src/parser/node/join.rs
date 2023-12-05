@@ -3,12 +3,27 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 
 /// 
 /// A node that parses its first child zero or more times, but only so long as
-/// the second child parses between each consecutive parse of the first child
-/// e.g. `Join('e', ',')` will parse sucessfully when given `"e"` or
-/// `"e,e,e,e"`, but not "eeee" or ",,,".
+/// the second child parses between each consecutive parse of the first child.
 /// 
-/// Because the second node is assumed to only be a delimiter, only a vector of
-/// the first node's results is returned.
+/// Because the second node is assumed to be an unimportant delimiter, only a
+/// vector of the first node's results is returned as the successful result of this
+/// node.
+/// 
+/// # Example
+/// 
+/// The node `Join('e', ',')` will parse according to the following table.
+/// 
+/// | Input   | Parsed  | Remaining |
+/// |---------|---------|-----------|
+/// | ""      | ""      | ""        |
+/// | "e"     | "e"     | ""        |
+/// | "e,"    | "e"     | ","       |
+/// | "e,e"   | "e,e"   | ""        |
+/// | "e,e,"  | "e,e"   | ","       |
+/// | "e,e,e" | "e,e,e" | ""        |
+/// | "eeeee" | "e"     | "eeee"    |
+/// | ",eeee" | ""      | ",eeee"   |
+/// | ",,,,," | ""      | ",,,,,"   |
 /// 
 #[allow(non_snake_case)]
 pub fn Join<Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, Store, Pos, V>, Ok1, Ok2, Err: From<NoAdvanceError<Pos>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(child1: Child1, child2: Child2) -> JoinNode<Child1, Child2, Ok1, Ok2, Err, Store, Pos, V> {

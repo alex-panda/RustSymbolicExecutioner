@@ -2,7 +2,11 @@ use zst::ZST;
 
 use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, ParseStore, ParseContext};
 
-
+/// 
+/// Returns a node that parses the given child node at the current parse
+/// position and then maps all `ParseResult::Okay` results to a new value using
+/// the given function.
+/// 
 #[allow(non_snake_case)]
 pub fn MapV<Child: ParseNode<Ok, Err, Store, Pos, V>, F: Fn(Ok) -> OOk, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, OOk>(child: Child, f: F) -> MapVNode<Child, F, Ok, Err, Store, Pos, V, OOk> {
     MapVNode {

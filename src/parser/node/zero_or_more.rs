@@ -4,7 +4,7 @@ use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult, NoA
 
 /// 
 /// Returns a parse node that will parse its child zero or more times and then
-/// return a `Vec` of the resulting successful values.
+/// return a vector of the resulting successful values.
 /// 
 #[allow(non_snake_case)]
 pub fn ZeroOrMore<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: From<NoAdvanceError<Pos>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(child: Child) -> ZeroOrMoreNode<Child, Ok, Err, Store, Pos, V> {

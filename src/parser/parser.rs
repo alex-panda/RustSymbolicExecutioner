@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
-use crate::{parser::{AnyOf6, ParseContext, OneOf, Not, AnyV, Funnel5, Funnel4, AnyMemTable, Funnel6, Join, Mem, Funnel2, AnyOf10, OneOf9, AnyOf9, OneOf8, MapPValue, Funnel9, LRJoin, Trace, Funnel10, Never, Funnel3, Funnel7, Funnel8, Funnel11, AnyOf8, OneOf11, AnyOf11, RLJoin, Funnel12, DPrint}, srule, symex::{SymExEngine, self, new_assert}};
+use crate::{parser::{ParseContext, Not, AnyV, Funnel4, AnyMemTable, Funnel6, Join, Funnel2, OneOf8, MapPValue, Funnel9, LRJoin, Funnel3, Funnel8, OneOf11, RLJoin, Funnel12, Funnel, AnyOf4, AnyOf11, AnyOf8}, srule, symex::{SymExEngine, self, new_assert}};
 
-use super::{ParseResult, Span, ZeroOrMore, ParseNode, SpanOf, Map, OneOf3, Spanned, OneOrMore, AnyOf3, Maybe, AnyOf2, MapV, OneOf6, SRule, Leader, Surround, End, Req, OneOf5, AnyOf5, AnyOf4, OneOf4, OneOf2, ParsePos, ParseStore};
+use super::{ParseResult, Span, ZeroOrMore, ParseNode, SpanOf, Map, OneOf3, Spanned, OneOrMore, AnyOf3, Maybe, AnyOf2, MapV, OneOf6, Leader, Surround, End, Req, OneOf5, OneOf4, OneOf2, ParsePos, ParseStore};
 
 use ParseResult::*;
 use unicode_xid::UnicodeXID;
@@ -777,16 +777,17 @@ impl RLit {
 
 impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RLit {
     fn into_lisp(&self, store: &Store) -> String {
+        use RLit::*;
         match self {
-            RLit::Char(c) => c.into_lisp(store),
-            RLit::String(s) => s.into_lisp(store),
-            RLit::RawString(s) => s.into_lisp(store),
-            RLit::Byte(b) => b.into_lisp(store),
-            RLit::ByteString(b) => b.into_lisp(store),
-            RLit::RawByteString(b) => b.into_lisp(store),
-            RLit::Integer(i) => i.into_lisp(store),
-            RLit::Float(f) => f.into_lisp(store),
-            RLit::Bool(b) => b.into_lisp(store),
+            Char(c) => c.into_lisp(store),
+            String(s) => s.into_lisp(store),
+            RawString(s) => s.into_lisp(store),
+            Byte(b) => b.into_lisp(store),
+            ByteString(b) => b.into_lisp(store),
+            RawByteString(b) => b.into_lisp(store),
+            Integer(i) => i.into_lisp(store),
+            Float(f) => f.into_lisp(store),
+            Bool(b) => b.into_lisp(store),
         }
     }
 }
@@ -1122,7 +1123,6 @@ impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RIntLit 
     }
 }
 
-use ParseResult::*;
 /// 
 /// Parses a file and returns the result.
 /// 
@@ -1242,7 +1242,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     // --- COMMENTS ---
 
     comment_rule.set(Funnel8(
-        MapV(("//", OneOf2(Not(OneOf(['/', '!', '\n'])), "//"), "symex", SpanOf(ZeroOrMore((Not('\n'), AnyV())))), |(_, _, symex, follow)| RComment::Symex { symex, follow }),
+        MapV(("//", OneOf2(Not(Funnel(['/', '!', '\n'])), "//"), "symex", SpanOf(ZeroOrMore((Not('\n'), AnyV())))), |(_, _, symex, follow)| RComment::Symex { symex, follow }),
         line_comment,
         block_comment,
         inner_line_doc,
@@ -1254,7 +1254,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
     line_comment_rule.set(MapV(
         Spanned(OneOf2(
-            ("//", OneOf2(Not(OneOf(['/', '!', '\n'])), "//"), SpanOf(ZeroOrMore((Not('\n'), AnyV())))),
+            ("//", OneOf2(Not(Funnel(['/', '!', '\n'])), "//"), SpanOf(ZeroOrMore((Not('\n'), AnyV())))),
             "//"
         )),
         |(span, any_of_two)| {
@@ -1270,7 +1270,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
             "/*",
             SpanOf((
                 OneOf3(
-                    Not(OneOf(['*', '!'])),
+                    Not(Funnel(['*', '!'])),
                     "**",
                     block_comment_or_doc
                 ),
@@ -1351,7 +1351,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
     suffix_rule.set(ident);
 
-    suffix_no_e_rule.set(SpanOf((Not(OneOf(['e', 'E'])), suffix)));
+    suffix_no_e_rule.set(SpanOf((Not(Funnel(['e', 'E'])), suffix)));
 
     // --- whitespace ---
 
@@ -1407,7 +1407,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         Spanned((
             '\'',
             SpanOf(OneOf4(
-                (Not(OneOf(['\'', '\\', '\n', '\r', '\t'])), AnyV()),
+                (Not(Funnel(['\'', '\\', '\n', '\r', '\t'])), AnyV()),
                 quote_escape,
                 ascii_escape,
                 unicode_escape
@@ -1420,7 +1420,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         }
     ));
 
-    quote_escape_rule.set(SpanOf(OneOf(["\\'", "\\\""])));
+    quote_escape_rule.set(SpanOf(Funnel(["\\'", "\\\""])));
 
     ascii_escape_rule.set(
         SpanOf(OneOf6(
@@ -1510,7 +1510,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         |(span, (_, _, value, _, suffix))| { RByteLit { span, value, suffix } }
     ));
 
-    ascii_for_char_rule.set((Not(OneOf(['\\', '\n', '\r', '\t'])), 0x00..=0x7F));
+    ascii_for_char_rule.set((Not(Funnel(['\\', '\n', '\r', '\t'])), 0x00..=0x7F));
 
     byte_escape_rule.set(
         OneOf8(
@@ -1609,7 +1609,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         |(span, (_, value))| { RHexLit { span, value } }
     ));
 
-    bin_digit_rule.set(OneOf(['0', '1']));
+    bin_digit_rule.set(Funnel(['0', '1']));
 
     oct_digit_rule.set(48..=55);
 
@@ -1648,8 +1648,8 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     ));
 
     float_exponent_rule.set(SpanOf((
-        OneOf(['e', 'E']),
-        Maybe(OneOf(['+', '-'])),
+        Funnel(['e', 'E']),
+        Maybe(Funnel(['+', '-'])),
         ZeroOrMore(OneOf2(dec_digit, '_')),
         dec_digit,
         ZeroOrMore(OneOf2(dec_digit, '_'))
@@ -1670,7 +1670,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
             ),
             (
                 OneOf2(bin_literal, oct_literal),
-                OneOf(['e', 'E'])
+                Funnel(['e', 'E'])
             ),
             (
                 "0b",

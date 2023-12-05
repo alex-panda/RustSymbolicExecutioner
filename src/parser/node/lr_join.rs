@@ -4,69 +4,88 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 /// # Left-to-Right Join Node
 /// 
 /// Returns a node that will parse one or more of its first child as long as
-/// each consecutive parse of its first child has a successful parse of its
-/// second child between it and the previous successfull parse of the first
-/// child. Every two parses of the first child are combined, from left to right,
-/// into a single result using the given function. As such, this node will
-/// return only a single result that is the same type as that which its first
-/// child produces. If, instead, you would like a list of joined results without
-/// a function congealing them into a single result, use the `Join` node instead.
+/// all consecutive parses of its first child have a successful parse of its
+/// second child (the delimiter) between them. After the first child is parsed
+/// one or more times, the resulting vector of results is combined into a single
+/// result (the overall result that this node will return) by repeatedly
+/// calling the given function on the left-most two results in the vector.
+/// 
+/// ## Examples
+/// 
+/// ### Simulating Left-Recursive Parsing
 /// 
 /// One reason to use this node would be to create a left-recursive AST without
-/// left recursion. For example, `LRJoin(expr, '+', |left, _, right| Expr::Add { left, right })`
-/// will parse one or more expressions so long as each expression has a `'+'`
-/// between it and the previous one. Then, the node will pass the left-most
-/// result in as the first argument of the given function, the `'+'` result as the
-/// second argument of the function, and the second left-most child in as the third
-/// argument of the function. What the function returns will then be considered
-/// the left-most result and the process will repeat again until there is only
+/// left recursion. For example, `LRJoin(expr, '+', |left, delim, right| Expr::Add { left, right })`
+/// will parse one or more expressions so long as each expression has a plus-sign character (`'+'`)
+/// between it and the previous parse. Then, the node will pass the left-most
+/// result of the vector in as the first argument of the given function, the plus-sign character result in as the
+/// second argument of the given function, and the second left-most result in as the third
+/// argument of the given function. What the function returns will then be considered
+/// the left-most result of the parse and the process will repeat again until there is only
 /// one child.
 /// 
+/// #### Simulating Left-Recursive Parsing Breakdown
+/// 
 /// ```{text}
-/// Conceptually, we start by parsing the first node (seperated by the second node) some number of times, putting each result onto a vector.
-/// vec![expr1, expr2, expr3, expr4]
-/// Then, we use some number of calls of the given function to turn it into a left-recursive AST.
-///         Add
-///         / \
-///       Add expr4
-///       / \
-///     Add expr3
-///     / \
-/// expr1 expr2
+/// // Conceptually, the childrens' results are parsed into two vectors like so:
 /// 
-/// To break this down into more steps, the result starts like this:
+/// vec![expr1, expr2, expr3, expr4] // the vector of child1 results
 /// 
-/// vec![expr1, expr2, expr3, expr4]
+/// vec![delim_1_2, delim_2_3, delim_3_4] // the vector of child2 results (1 less result because the second child is only parsed between parses of the first child)
 /// 
-/// Empty AST
+/// // Then, the function is repeatedly called using the left-most values of the vector of child1 results to turn it into a left-recursive AST.
 /// 
-/// Then, after one call of the function, the result looks like this (`Add` is what was returned by the function):
-/// vec![Add, expr3, expr4]
-/// 
-///     Add
-///     / \
-/// expr1 expr2
-/// 
-/// After another call, the result looks like this:
-/// vec![Add1, expr4]
-/// 
-///       Add1
-///       / \
-///     Add expr3
-///     / \
-/// expr1 expr2
-/// 
-/// After another call, the result then looks like this:
-/// vec![Add2]
-///          Add2
+///          add2
 ///          / \
-///       Add1 expr4
+///       add1 expr4
 ///       / \
-///     Add expr3
+///     add expr3
 ///     / \
 /// expr1 expr2
 /// 
-/// Since there is only one result left in the vector, said result (`Add2`) is returned as the final result of the parse.
+/// // As a breakdown, the results start like this:
+/// 
+/// vec![expr1, expr2, expr3, expr4]
+/// 
+/// vec![delim_1_2, delim_2_3, delim_3_4]
+/// 
+/// // Then, after one call of the function with the left-most nodes, the results looks like this (where `add` is the AST node that was returned by the function call and the function throws away the `delim_1_2` result given to it):
+/// 
+/// vec![add, expr3, expr4]
+/// 
+/// vec![delim_2_3, delim_3_4]
+/// 
+///     add
+///     / \
+/// expr1 expr2
+/// 
+/// // After another call, the results look like this:
+/// 
+/// vec![add1, expr4]
+/// 
+/// vec![delim_3_4]
+/// 
+///       add1
+///       / \
+///     add expr3
+///     / \
+/// expr1 expr2
+/// 
+/// // After yet another call, the results look like this:
+/// 
+/// vec![add2]
+/// 
+/// vec![]
+/// 
+///          add2
+///          / \
+///       add1 expr4
+///       / \
+///     add expr3
+///     / \
+/// expr1 expr2
+/// 
+/// // Since there is now only one result in the vector, `add2` is returned as the final result of the node.
 /// ```
 /// 
 #[allow(non_snake_case)]
@@ -99,6 +118,9 @@ impl <Child1: ParseNode<Ok1, Err, Store, Pos, V>, Child2: ParseNode<Ok2, Err, St
             Error(error) => return Error(error),
             Panic(error) => return Panic(error),
         };
+
+        // successful parse of child1 so continue on to next parses seperated by
+        // child2 (the delimiter)
 
         let mut last = cxt.pos.clone();
 

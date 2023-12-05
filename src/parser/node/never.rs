@@ -2,6 +2,10 @@ use crate::parser::{ZSTNode, Span, ParseContext, NeverError};
 
 use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult, UnexpectedSuccessError};
 
+/// 
+/// Returns a node that never parses its child node and always fails to parse. The main
+/// use of this node is for debugging purposes.
+/// 
 #[allow(non_snake_case)]
 pub fn Never<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: From<NeverError>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(child: Child) -> NeverNode<Child, Ok, Err, Store, Pos, V> {
     NeverNode { child, _zst: ZSTNode::default() }
