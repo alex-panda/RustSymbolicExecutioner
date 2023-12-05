@@ -753,16 +753,17 @@ impl RLit {
 
 impl <Store: ParseStore<PPos, char> + ?Sized> IntoLisp<Store, PPos> for RLit {
     fn into_lisp(&self, store: &Store) -> String {
+        use RLit::*;
         match self {
-            RLit::Char(c) => c.into_lisp(store),
-            RLit::String(s) => s.into_lisp(store),
-            RLit::RawString(s) => s.into_lisp(store),
-            RLit::Byte(b) => b.into_lisp(store),
-            RLit::ByteString(b) => b.into_lisp(store),
-            RLit::RawByteString(b) => b.into_lisp(store),
-            RLit::Integer(i) => i.into_lisp(store),
-            RLit::Float(f) => f.into_lisp(store),
-            RLit::Bool(b) => b.into_lisp(store),
+            Char(c) => c.into_lisp(store),
+            String(s) => s.into_lisp(store),
+            RawString(s) => s.into_lisp(store),
+            Byte(b) => b.into_lisp(store),
+            ByteString(b) => b.into_lisp(store),
+            RawByteString(b) => b.into_lisp(store),
+            Integer(i) => i.into_lisp(store),
+            Float(f) => f.into_lisp(store),
+            Bool(b) => b.into_lisp(store),
         }
     }
 }

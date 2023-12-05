@@ -4,92 +4,88 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 /// # Right-to-Left Join Node
 /// 
 /// Returns a node that will parse one or more of its first child as long as
-/// every two consecutive parses of its first child have a successful parse of its
+/// all consecutive parses of its first child have a successful parse of its
 /// second child (the delimiter) between them. After the first child is parsed
 /// one or more times, the resulting vector of results is combined into a single
-/// result (the overall result that this node then returns) by repeatedly
-/// calling the given function on the right-most results in the vector.
+/// result (the overall result that this node will return) by repeatedly
+/// calling the given function on the right-most two results in the vector.
 /// 
 /// ## Examples
 /// 
-/// ### Simulating Left-Recursive Parsing
+/// ### Simulating Right-Recursive Parsing
 /// 
 /// One reason to use this node would be to create a right-recursive AST without
-/// right recursion. For example, `RLJoin(expr, '+', |left, plus_span, right| Expr::Add { left, plus_span, right })`
+/// right recursion. For example, `RLJoin(expr, '+', |left, delim, right| Expr::Add { left, right })`
 /// will parse one or more expressions so long as each expression has a plus-sign character (`'+'`)
 /// between it and the previous parse. Then, the node will pass the second right-most
-/// result of the vector in as the first argument of the given function, the plus-sign character result in as the
-/// second argument of the given function, and the right-most child's result in as the third
-/// argument of the function. What the function returns will then be considered
+/// result in as the first argument of the given function, the plus-sign character result in as the
+/// second argument of the given function, and the right-most result in as the third
+/// argument of the given function. What the function returns will then be considered
 /// the right-most result of the parse and the process will repeat again until there is only
 /// one child.
 /// 
-/// #### Simualating Left-Recursive Parsing Breakdown
+/// #### Simulating Right-Recursive Parsing Breakdown
 /// 
 /// ```{text}
-/// Conceptually, the first child's results are parsed into two vectors like so:
+/// // Conceptually, the childrens' results are parsed into two vectors like so:
 /// 
 /// vec![expr1, expr2, expr3, expr4] // the vector of child1 results
 /// 
-/// vec![delim_1_2, delim_2_3, delim_3_4] // the vector of child2 results (1 less result because they are between the child1 results)
+/// vec![delim_1_2, delim_2_3, delim_3_4] // the vector of child2 results (1 less result because the second child is only parsed between parses of the first child)
 /// 
-/// Then, the function is repeatedly called on the right-most values of
-/// the vector to turn it into a left-recursive AST.
+/// // Then, the function is repeatedly called using the right-most values of the vector to turn it into a right-recursive AST.
 /// 
-///         add2
+///     add2
+///     / \
+/// expr1 add1
+///       / \
+///   expr2 add
 ///         / \
-///     expr1 add1
-///           / \
-///       expr2 add
-///             / \
-///         expr3 expr4
+///     expr3 expr4
 /// 
-/// As a breakdown, the results start like this:
+/// // As a breakdown, the results start like this:
 /// 
 /// vec![expr1, expr2, expr3, expr4]
 /// 
 /// vec![delim_1_2, delim_2_3, delim_3_4]
 /// 
-/// Then, after one call of the function with the right-most nodes, the results
-/// looks like this (where `add` is the AST node that was returned by the
-/// function call and it ignores the `delim_2_3` result given to it):
+/// // Then, after one call of the function with the right-most nodes, the results looks like this (where `add` is the AST node that was returned by the function call and the function throws away the `delim_3_4` result given to it):
 /// 
 /// vec![expr1, expr2, add]
 /// 
 /// vec![delim_1_2, delim_2_3]
 /// 
-///     add
-///     / \
-/// expr3 expr4
+///         add
+///         / \
+///     expr3 expr4
 /// 
-/// After another call, the results look like this:
+/// // After another call, the results look like this:
 /// 
 /// vec![expr1, add1]
-/// 
 /// 
 /// vec![delim_1_2]
 /// 
 ///       add1
 ///       / \
 ///   expr2 add
-///        / \
+///         / \
 ///     expr3 expr4
 /// 
-/// After another call, the results look like this:
+/// // After yet another call, the results look like this:
 /// 
 /// vec![add2]
 /// 
 /// vec![]
 /// 
-///          add2
-///          / \
-///      expr1 add1
-///            / \
-///        expr2 add
-///              / \
-///          expr3 expr4
+///     add2
+///     / \
+/// expr1 add1
+///       / \
+///   expr2 add
+///         / \
+///     expr3 expr4
 /// 
-/// Since there is only one result left in the vector, `Add2` is returned as the final result.
+/// // Since there is now only one result in the vector, `add2` is returned as the final result of the node.
 /// ```
 /// 
 #[allow(non_snake_case)]
