@@ -3,6 +3,10 @@ use crate::parser::{Span, ZSTNode, ParseContext};
 use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult};
 
 
+/// 
+/// Returns a node that maps all successfull parses of its child node to the
+/// span of the successfully parsed material.
+/// 
 #[allow(non_snake_case)]
 pub fn SpanOf<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(child: Child) -> SpanOfNode<Child, Ok, Err, Store, Pos, V> {
     SpanOfNode { child, _zst: ZSTNode::default() }

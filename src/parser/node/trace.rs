@@ -2,6 +2,11 @@ use crate::parser::{ZSTNode, ParseContext};
 
 use super::super::{ParseStore, ParsePos, ParseValue, ParseNode, ParseResult};
 
+/// 
+/// Returns a node that calls the given function with the current parse position
+/// every time it is parsed. Its main use is for debugging purposes as it allows
+/// `println!()` statements to be more easily inserted into the parse tree.
+/// 
 #[allow(non_snake_case)]
 pub fn Trace<F: Fn(Pos), Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(f: F) -> TraceNode<F, Err, Store, Pos, V> {
     TraceNode {

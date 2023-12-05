@@ -73,6 +73,9 @@ impl <Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseStore<Pos, V
 }
 
 /// 
+/// 
+/// Note: this node currently has bugs in it and appears to not work.
+/// 
 /// A trait for implementing all the features than an `LRec` node needs during
 /// each parse.
 /// 

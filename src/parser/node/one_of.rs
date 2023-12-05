@@ -6,66 +6,6 @@ use std::fmt::Debug;
 use ParseResult::*;
 use zst::ZST;
 
-/// 
-/// The constructor for the `OneOf` parse node.
-/// 
-/// A `OneOf` parse node tries to parse each of its children one by one and
-/// returns the result of the firsth child that parses successfully.
-/// 
-/// If you would like to know what child parsed successfully or have the
-/// children be of different types, you should use one of the `OneOf*` nodes
-/// instead (where `*` is the written number of children the node has).
-/// 
-#[allow(non_snake_case)]
-pub fn OneOf<Child, Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, const N: usize>(children: [Child; N]) -> OneOfNode<Child, Ok, Err, Store, Pos, V, N> {
-    OneOfNode {
-        children,
-        _zst: ZSTNode::default(),
-        _ok1: ZST::default(),
-    }
-}
-
-pub struct OneOfNode<Child, Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, const N: usize> {
-    children: [Child; N],
-    _zst: ZSTNode<Child, Err, Store, Pos, V>,
-    _ok1: ZST<Ok>,
-}
-
-
-impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V>, const N: usize> ParseNode<Ok, Err, Store, Pos, V> for OneOfNode<Child, Ok, Err, Store, Pos, V, N> {
-    fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
-        let mut out = core::array::from_fn(|_| None);
-        for (i, child) in self.children.iter().enumerate() {
-            match child.parse(cxt.clone()) {
-                Okay(value, advance) => return Okay(value, advance),
-                Error(error) => out[i] = Some(error),
-                Panic(error) => return Panic(error),
-            }
-        }
-
-        Error(AllChildrenFailedError { pos: cxt.pos, errors: out.map(|v| if let Some(v) = v { v } else { panic!("`OneOf` node expected either success or {} errors, but less errors than expected were given", N) }) }.into())
-    }
-
-    fn parse_span<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Span<Pos>, Err, Pos> {
-        let mut out = core::array::from_fn(|_| None);
-        for (i, child) in self.children.iter().enumerate() {
-            match child.parse_span(cxt.clone()) {
-                Okay(value, advance) => return Okay(value, advance),
-                Error(error) => out[i] = Some(error),
-                Panic(error) => return Panic(error),
-            }
-        }
-
-        Error(AllChildrenFailedError { pos: cxt.pos, errors: out.map(|v| if let Some(v) = v { v } else { panic!("`OneOf` node expected either success or {} errors, but less errors than expected were given", N) }) }.into())
-    }
-}
-
-impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, Child: ParseNode<Ok, Err, Store, Pos, V> + Clone, const N: usize> Clone for OneOfNode<Child, Ok, Err, Store, Pos, V, N> {
-    fn clone(&self) -> Self {
-        Self { children: self.children.clone(), _zst: self._zst.clone(), _ok1: Default::default() }
-    }
-}
-
 macro_rules! impl_one_of {
     ($fn_id: ident, $node_id: ident, $any_of_id: ident, $num: tt, $($lower_child_id: ident | $child_id: ident | $lower_ok_id: ident | $ok_id: ident),*) => {
         #[allow(non_snake_case)]

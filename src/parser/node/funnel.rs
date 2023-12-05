@@ -7,10 +7,12 @@ use zst::ZST;
 
 
 /// 
-/// Funnels its children (which must all must be of the same type) into one
-/// output type.
+/// Returns a node that that tries each of its children at the current parse
+/// position in the order that they are given in and returns the result of the
+/// first child that parses successfully. The node fails to parse if all
+/// children fail to parse at the current position.
 /// 
-/// If you would like to know which child parsed successfully use a `OneOf*`
+/// If you would like to know which child parsed successfully, use a `OneOf*`
 /// node instead (where `*` is a number of children the node has).
 /// 
 #[allow(non_snake_case)]

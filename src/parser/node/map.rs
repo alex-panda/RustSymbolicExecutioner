@@ -4,6 +4,11 @@ use crate::parser::{ZSTNode, ParseContext};
 
 use super::super::{ParseStore, ParsePos, ParseValue, ParseNode, ParseResult};
 
+/// 
+/// Returns a node that will parse the given child node at the current parse
+/// position and then maps the result of its child's parse to a new result using
+/// the given function.
+/// 
 #[allow(non_snake_case)]
 pub fn Map<Child: ParseNode<Ok, Err, Store, Pos, V>, F: Fn(ParseResult<Ok, Err, Pos>) -> ParseResult<OOk, OErr, Pos>, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue, OOk, OErr>(child: Child, f: F) -> MapNode<Child, F, Ok, Err, Store, Pos, V, OOk, OErr> {
     MapNode {

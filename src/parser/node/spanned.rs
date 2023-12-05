@@ -1,5 +1,11 @@
 use crate::parser::{Span, ParsePos, ParseStore, ParseValue, ParseNode, ParseResult, ZSTNode, ParseContext};
 
+
+/// 
+/// Returns a node that returns a tuple containing both the span of every
+/// successful parse of its child node and the result of every successful parse
+/// of its child node.
+/// 
 #[allow(non_snake_case)]
 pub fn Spanned<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(child: Child) -> SpannedNode<Child, Ok, Err, Store, Pos, V> {
     SpannedNode { child, _zst: ZSTNode::default() }

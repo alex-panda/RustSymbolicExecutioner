@@ -44,9 +44,9 @@ impl <Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseStore<Pos, V
 /// 
 /// A trait for a type that acts as a memoization table for a `MemNode`.
 /// 
-/// If `Err(..)` is returned by any of the functions, then the return error will
-/// end the parse by being wrapped in a `ParseResult::Panic(..)` and then
-/// returned.
+/// If `Err(err)` is returned by any of this trait's functions, then the return
+/// error will end the parse by being wrapped in a `ParseResult::Panic(err)` and
+/// then returned.
 /// 
 /// It is okay for the implementor to not actually store any value passed to the
 /// `mem_set` function or for `mem_get` to return `None` for a value that is
@@ -70,13 +70,14 @@ pub trait MemTable<Ok, Err, Pos: ParsePos> {
 
 /// 
 /// Returns a `Mem` node that will memoize the parse result of its child node for each
-/// position that its child parses. This allows for closer-to-linear-time parses
+/// position that its child parses at. This allows parses to be closer to linear time
 /// as any memoized rule will never parse its child at the same position twice.
-/// This is acheived by the `Mem` node parsing its child once at any given
-/// position -- the first time the node parses at the position -- and then returning
-/// clones of the result all times after the first.
+/// This is acheived by the `Mem` node parsing its child once at the current parse
+/// position, saving the node in the memoization table, and then returning a
+/// clone of the memoized result every time this node parses at the saved parse
+/// position.
 /// 
-/// Note: The node ruturned by this function ONLY implements memoization. It
+/// Note: The node returned by this function ONLY implements memoization. It
 /// does not allow for direct or indirect left recursion. Use `LRec` if you
 /// would like a node that both memoizes the parse result and allows for
 /// indirect and direct left recursion.
@@ -91,21 +92,22 @@ pub trait MemTable<Ok, Err, Pos: ParsePos> {
 ///         in the same memoization table for more than one parse will cause
 ///         undefined behavior as the memoized values from the last parse will
 ///         effect the memoized values of the current parse. The same memoization
-///         table can only be passed in for more than one parse if either the
-///         memoization table's values are cleared between parses or if the
-///         parse node is not moved between parses and the `ParseStore`
-///         being parsed for both parses is exactly the same.
+///         table can only be passed in for more than one parse if the
+///         memoization table's values are cleared between parses.
 /// 
-/// Depending on the implementation of the `MemTable`, a heap allocator is not
-/// necessary for this node to function. This is because, assuming the
-/// `MemTable` implementation has a fixed amount of memory and runs out of
-/// memory to store its child's results, the `MemTable` implementation can
-/// simply stop storing any new parse results passed into the `mem_set`
-/// function. Keep in mind, however, that any result not memoized will mean that
-/// the next time the node parses at the same position it will parse its child
-/// node again rather than returning a clone of the previously-memoized result
-/// (because the previously-memoized result was thrown away instead of actually
-/// being memoized).
+/// Depending on the implementation of the memoization table, a heap allocator
+/// is not necessary for this node to function. This is because this node does
+/// not require that its memoization table be consistent. The memoization table
+/// is allowed to forget values and/or fail to store values. Because of this, a
+/// fixed-sized implementation of the memoization table is possible as it can
+/// simply stop storing new parse results when it runs out of memory to do so.
+/// 
+/// In addition, this node (unlike the `LRec` node) does not require that all of
+/// its kind share the same memoization table. As such, the `ParseStore` can
+/// implement `MemTable` for every `Ok` and `Err` type combination required by
+/// the parse tree, therefore removing any need for dynamic allocation/dispatch
+/// that would otherwise be necessary so that one `MemTable` can hold
+/// multiple `Ok` and `Err` type combinations.
 /// 
 #[allow(non_snake_case)]
 pub fn Mem<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok: Clone, Err: Clone, Store: ParseStore<Pos, V> + MemTable<Ok, Err, Pos> + ?Sized, Pos: ParsePos, V: ParseValue>(child: Child) -> MemNode<Child, Ok, Err, Store, Pos, V> {

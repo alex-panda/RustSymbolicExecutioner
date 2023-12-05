@@ -2,15 +2,16 @@ use crate::parser::{Span, UnexpectedEndError, ParseContext};
 
 use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult};
 
+/// 
+/// Returns a node that consumes the current value of the parse, only failing if
+/// the parse is out of values (i.e. we are at or past the end of the material
+/// being parsed).
+/// 
 #[allow(non_snake_case)]
 pub fn AnyV() -> AnyVNode {
     AnyVNode
 }
 
-/// 
-/// A node that matches and consumes any value of the parse, only failing if
-/// there is no value in the parse.
-/// 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AnyVNode;
 
