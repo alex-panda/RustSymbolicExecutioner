@@ -66,7 +66,7 @@ impl <Ok, Err: From<AllChildrenFailedError<Pos, Err, N>>, Store: ParseStore<Pos,
 }
 
 macro_rules! impl_one_of {
-    ($fn_id: ident, $node_id: ident, $num: tt, $($lower_child_id: ident | $child_id: ident),*) => {
+    ($fn_id: ident, $node_id: ident, $num: tt $(, $lower_child_id: ident | $child_id: ident)*) => {
         /// 
         /// Returns a node that tries each of its child nodes in the order
         /// they are given and returns the result of the first one that
@@ -76,20 +76,20 @@ macro_rules! impl_one_of {
         /// node has).
         /// 
         #[allow(non_snake_case)]
-        pub fn $fn_id<$($child_id: ParseNode<Ok, Err, Store, Pos, V>),*, Ok, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>($($lower_child_id: $child_id),*) -> $node_id<$($child_id),*, Ok, Err, Store, Pos, V> {
+        pub fn $fn_id<$($child_id: ParseNode<Ok, Err, Store, Pos, V>,)* Ok, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>($($lower_child_id: $child_id,)*) -> $node_id<$($child_id,)* Ok, Err, Store, Pos, V> {
             $node_id {
                 _zst: ZSTNode::default(),
-                $($lower_child_id),*,
+                $($lower_child_id,)*
             }
         }
 
         #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-        pub struct $node_id<$($child_id),*, Ok, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> {
+        pub struct $node_id<$($child_id,)* Ok, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> {
             _zst: ZSTNode<Ok, Err, Store, Pos, V>,
-            $($lower_child_id:$child_id),*,
+            $($lower_child_id:$child_id,)*
         }
 
-        impl <$($child_id: ParseNode<Ok, Err, Store, Pos, V>),*, Ok, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<Ok, Err, Store, Pos, V> for $node_id<$($child_id),*, Ok, Err, Store, Pos, V> {
+        impl <$($child_id: ParseNode<Ok, Err, Store, Pos, V>,)* Ok, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<Ok, Err, Store, Pos, V> for $node_id<$($child_id,)* Ok, Err, Store, Pos, V> {
             fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<Ok, Err, Pos> {
                 let errors = [$(
                     match self.$lower_child_id.parse(cxt.clone()) {
@@ -117,6 +117,8 @@ macro_rules! impl_one_of {
     };
 }
 
+impl_one_of!(Funnel0, Funnel0Node, 0);
+impl_one_of!(Funnel1, Funnel1Node, 1, child1 | Child1);
 impl_one_of!(Funnel2, Funnel2Node, 2, child1 | Child1, child2 | Child2);
 impl_one_of!(Funnel3, Funnel3Node, 3, child1 | Child1, child2 | Child2, child3 | Child3);
 impl_one_of!(Funnel4, Funnel4Node, 4, child1 | Child1, child2 | Child2, child3 | Child3, child4 | Child4);

@@ -66,7 +66,7 @@ impl <Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: From<EmptyRuleError>, S
         }
     }
 
-    pub fn din<'a>(&'a self) -> &dyn ParseNode<Ok, Err, Store, Pos, V> {
+    pub fn din<'a>(&'a self) -> &'a dyn ParseNode<Ok, Err, Store, Pos, V> {
         self
     }
 

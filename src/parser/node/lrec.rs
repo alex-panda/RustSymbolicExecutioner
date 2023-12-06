@@ -73,9 +73,6 @@ impl <Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> ParseStore<Pos, V
 }
 
 /// 
-/// 
-/// Note: this node currently has bugs in it and appears to not work.
-/// 
 /// A trait for implementing all the features than an `LRec` node needs during
 /// each parse.
 /// 
@@ -302,6 +299,8 @@ pub struct Head {
     pub evaluation_set: HashSet<usize>,
 }
 
+/// 
+/// WARNING: this node currently has bugs in it and does not work.
 /// 
 /// Returns an `LRec` node that will memoize the result of parsing its child
 /// node for each position it parses. This node also enables both direct and
