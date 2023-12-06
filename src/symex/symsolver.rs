@@ -18,7 +18,7 @@ impl SymSolver {
         
         SymSolver {
             s: SmtConf::z3(PATH_TO_SOLVER).spawn(()).unwrap(),
-            pi_str: "".to_string(),
+            pi_str: "true".to_string(),
             int_str: "".to_string(),
             assert_str: "".to_string(),
             satisfiable: true,

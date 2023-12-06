@@ -163,11 +163,11 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RStatement {
                     RComment::Symex { symex, .. } => {
                         engine[id].reached_symex = true;
                         let mut vec = Vec::new();
+                        println!("{}", engine[id].to_string());
                         vec.push(SymexRes {
                             symex_pos: symex.clone(),
                             res: engine[id].to_string()
                         });
-                        println!("{}", engine[id].to_string());
                         
                         return Ok(ExOk { cont: true, res: vec });
                     },
@@ -248,14 +248,10 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RIf {
                 if let Some(prev) = prev {
                     res = prev.execute(store, engine, id)?;
                 }
-                //println!("{}",expr.into_lisp(store));
-                
-                //println!("{}", path_id);
 
                 Ok(res)
             },
             RIf::Else { prev, block, .. } => {
-                //println!("{}", id);
                 let mut res = prev.execute(store, engine, id)?;
                 res.res.extend(block.execute(store, engine, id)?.res);
                 Ok(res)
@@ -2386,13 +2382,20 @@ fn s_if(mut x:i32, mut y:i32) -> i32 {
     x = y * 2;
     if x == 6 {
         y = y + 3;
-        //symex
+        if y > 2 {
+            y = 3;
+            //symex
+        }
+        
     }
     else {
-        //symex
         y = y + 4;
+        
     }
+
+    x = x / 2;
     //symex
+
 }
 ";
         match parse_file(s) {
@@ -2403,11 +2406,11 @@ fn s_if(mut x:i32, mut y:i32) -> i32 {
                 let _result = value.execute(s, &mut engine, 0);
                 //let mut i = 0;
                 //while i < engine.len() {
-                 //   //println!("{}", i);
+                    //println!("{}", i);
                 //    if engine[i].pi.satisfiable && engine[i].reached_symex {
-                 //     println!("{}", engine[i].to_string());
-                  //  }
-                   // i = i + 1;
+                //      println!("{}", engine[i].to_string());
+                //    }
+                //    i = i + 1;
                 //}
             },
             Error(error) => panic!("Error: {}", error),

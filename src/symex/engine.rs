@@ -36,7 +36,7 @@ impl SymExEngine {
             s = s + "\t" + &self.sigma[i].to_string() + "\n";
             i = i + 1;
         }
-        format!("path: {}\npi: {} {}\nsigma: {}", &self.path, &self.pi.satisfiable.to_string(), &self.pi.to_string(), s)
+        format!("path id: {}\npi: {} && {}\nsigma: {}", &self.path, &self.pi.satisfiable.to_string(), &self.pi.to_string(), s)
     }
 
     //creates symvar from function header
