@@ -240,16 +240,19 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RIf {
             RIf::If { prev, expr, block, .. } => {
                 let mut res = ExOk { cont: true, res: Vec::new() };
 
+                let path_id = new_assert(engine, id, expr.span().into_string(store), expr.into_lisp(store));
+                res.res.extend(block.execute(store, engine, path_id)?.res);
                 if let Some(prev) = prev {
                     res = prev.execute(store, engine, id)?;
                 }
-                println!("{}",expr.into_lisp(store));
-                let path_id = new_assert(engine, id, expr.span().into_string(store), expr.into_lisp(store));
-                println!("{}", path_id);
-                res.res.extend(block.execute(store, engine, path_id)?.res);
+                //println!("{}",expr.into_lisp(store));
+                
+                //println!("{}", path_id);
+
                 Ok(res)
             },
             RIf::Else { prev, block, .. } => {
+                //println!("{}", id);
                 let mut res = prev.execute(store, engine, id)?;
                 res.res.extend(block.execute(store, engine, id)?.res);
                 Ok(res)
@@ -2378,15 +2381,12 @@ fn s2_ifStmt(mut x:i32, mut y:i32) -> i32 {
         let s = "
 fn s_if(mut x:i32, mut y:i32) -> i32 {
     x = y * 2;
-    if x == 5 {
+    if x == 6 {
         y = y + 3;
     }
-
-    y = 5;
-    if y == 6 {
-        x = 5;
+    else {
+        y = y + 4;
     }
-    
     //symex
 }
 ";
@@ -2395,6 +2395,13 @@ fn s_if(mut x:i32, mut y:i32) -> i32 {
                 let mut engine = Vec::new();
                 println!("{:?}", value);
                 println!("{:?}", value.execute(s, &mut engine, 0));
+
+                let mut i = 0;
+                while i < engine.len() {
+                    //println!("{}", i);
+                    println!("{}", engine[i].to_string());
+                    i = i + 1;
+                }
             },
             Error(error) => panic!("Error: {}", error),
             Panic(error) => panic!("Panic: {}", error),

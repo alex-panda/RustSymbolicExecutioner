@@ -35,12 +35,14 @@ pub fn clone_engine(engines: &mut Vec<SymExEngine>, path: usize) {
 
 
 pub fn new_assert(e: &mut Vec<SymExEngine>, path: usize, assert: String, lisp: String) -> usize {
+    //println!("new assert");
     let l = e.len();
     clone_engine(e, path);
-    e[path].new_assertion(assert.clone(), lisp.clone());
+    
+    e[l].new_assertion(assert.clone(), lisp.clone());
     let neg_assert = "!".to_owned() + &assert.clone();
     let neg_lisp = format!("(not {})", lisp.clone());
-    e[l].new_assertion(neg_assert.clone(), neg_lisp);
+    e[path].new_assertion(neg_assert.clone(), neg_lisp);
     l
 }
 

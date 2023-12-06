@@ -52,30 +52,30 @@ impl SymSolver {
         }
     }
     pub fn add_assertion_to_solver(&mut self, assert: &String) {
-        println!("asserting {}", assert.clone());
+        //println!("asserting {}", assert.clone());
         self.s.assert(assert.clone()).unwrap();
         self.assert_str = format!("{}#{}", self.assert_str, assert.clone());
         let is_sat = self.s.check_sat();
         match is_sat {
             Ok(b, ..) => {
                 if !b{
-                    self.assert_str = format!("{}#{}", self.assert_str, "Path assertions not valid");
+                    self.pi_str = format!("{}#{}", self.pi_str, "Path assertions not valid");
                 }
             }, 
-            Err(E) => self.assert_str = format!("{}#{}", self.assert_str, "Path assertions not valid"),
+            Err(E) => self.pi_str = format!("{}#{}", self.pi_str, "Path assertions not valid"),
         }   
     }
     pub fn load_solver(&self) -> Solver<()> {
         let mut s = SmtConf::z3(PATH_TO_SOLVER).spawn(()).unwrap();
         let ints = self.int_str.split("#");
         for i in ints {
-            println!("{}", i);
+            //println!("{}", i);
             //s.declare_const(i.clone(), "Int");
         }
 
         let asserts = self.assert_str.split("#");
         for a in asserts {
-            println!("{}", a);
+           // println!("{}", a);
             s.assert(a.clone().to_string());
         }
         return s;
