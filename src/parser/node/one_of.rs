@@ -7,23 +7,29 @@ use ParseResult::*;
 use zst::ZST;
 
 macro_rules! impl_one_of {
-    ($fn_id: ident, $node_id: ident, $any_of_id: ident, $num: tt, $($lower_child_id: ident | $child_id: ident | $lower_ok_id: ident | $ok_id: ident),*) => {
+    ($fn_id: ident, $node_id: ident, $any_of_id: ident, $num: tt $(, $lower_child_id: ident | $child_id: ident | $lower_ok_id: ident | $ok_id: ident)*) => {
+        /// 
+        /// Returns a node that tries each of its child nodes in the order that
+        /// they are given and then returns the result of the first one that
+        /// parses successfully. Unlike `Funnel*` (where "*" is the number of
+        /// children) this node allows its children to return different types.
+        /// 
         #[allow(non_snake_case)]
-        pub fn $fn_id<$($child_id: ParseNode<$ok_id, Err, Store, Pos, V>),*, $($ok_id),*, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>($($lower_child_id: $child_id),*) -> $node_id<$($child_id),*, $($ok_id),*, Err, Store, Pos, V> {
+        pub fn $fn_id<$($child_id: ParseNode<$ok_id, Err, Store, Pos, V>,)* $($ok_id,)* Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>($($lower_child_id: $child_id),*) -> $node_id<$($child_id,)* $($ok_id,)* Err, Store, Pos, V> {
             $node_id {
                 _zst: ZSTNode::default(),
-                $($lower_child_id),*,
-                $($lower_ok_id: Default::default()),*,
+                $($lower_child_id,)*
+                $($lower_ok_id: Default::default(),)*
             }
         }
 
-        pub struct $node_id<$($child_id),*, $($ok_id),*, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> {
+        pub struct $node_id<$($child_id,)* $($ok_id,)* Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> {
             _zst: ZSTNode<(), Err, Store, Pos, V>,
-            $($lower_child_id:$child_id),*,
-            $($lower_ok_id: ZST<$ok_id>),*,
+            $($lower_child_id: $child_id,)*
+            $($lower_ok_id: ZST<$ok_id>,)*
         }
 
-        impl <$($child_id: ParseNode<$ok_id, Err, Store, Pos, V>),*, $($ok_id),*, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<$any_of_id<$($ok_id),*>, Err, Store, Pos, V> for $node_id<$($child_id),*, $($ok_id),*, Err, Store, Pos, V> {
+        impl <$($child_id: ParseNode<$ok_id, Err, Store, Pos, V>,)* $($ok_id,)* Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> ParseNode<$any_of_id<$($ok_id),*>, Err, Store, Pos, V> for $node_id<$($child_id,)* $($ok_id,)* Err, Store, Pos, V> {
             fn parse<'a>(&self, cxt: ParseContext<'a, Store, Pos, V>) -> ParseResult<$any_of_id<$($ok_id),*>, Err, Pos> {
                 let errors = [$(
                     match self.$lower_child_id.parse(cxt.clone()) {
@@ -49,31 +55,33 @@ macro_rules! impl_one_of {
             }
         }
 
-        impl <$($child_id: ParseNode<$ok_id, Err, Store, Pos, V> + Clone),*, $($ok_id),*, Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> Clone for $node_id<$($child_id),*, $($ok_id),*, Err, Store, Pos, V> {
+        impl <$($child_id: ParseNode<$ok_id, Err, Store, Pos, V> + Clone,)* $($ok_id,)* Err: From<AllChildrenFailedError<Pos, Err, $num>>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> Clone for $node_id<$($child_id,)* $($ok_id,)* Err, Store, Pos, V> {
             fn clone(&self) -> Self {
                 Self {
                     _zst: ZSTNode::default(),
-                    $($lower_child_id: self.$lower_child_id.clone()),*,
-                    $($lower_ok_id: Default::default()),*,
+                    $($lower_child_id: self.$lower_child_id.clone(),)*
+                    $($lower_ok_id: Default::default(),)*
                 }
             }
         }
 
         #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub enum $any_of_id<$($ok_id),*> {
-            $($child_id($ok_id)),*,
+            $($child_id($ok_id),)*
         }
     };
 }
 
-impl_one_of!(OneOf2, OneOf2Node, AnyOf2, 2, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2);
-impl_one_of!(OneOf3, OneOf3Node, AnyOf3, 3, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3);
-impl_one_of!(OneOf4, OneOf4Node, AnyOf4, 4, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4);
-impl_one_of!(OneOf5, OneOf5Node, AnyOf5, 5, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5);
-impl_one_of!(OneOf6, OneOf6Node, AnyOf6, 6, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6);
-impl_one_of!(OneOf7, OneOf7Node, AnyOf7, 7, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6, child7 | Child7 | ok7 | Ok7);
-impl_one_of!(OneOf8, OneOf8Node, AnyOf8, 8, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6, child7 | Child7 | ok7 | Ok7, child8 | Child8 | ok8 | Ok8);
-impl_one_of!(OneOf9, OneOf9Node, AnyOf9, 9, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6, child7 | Child7 | ok7 | Ok7, child8 | Child8 | ok8 | Ok8, child9 | Child9 | ok9 | Ok9);
+impl_one_of!(OneOf0 , OneOf0Node , AnyOf0 , 0);
+impl_one_of!(OneOf1 , OneOf1Node , AnyOf1 , 1 , child1 | Child1 | ok1 | Ok1);
+impl_one_of!(OneOf2 , OneOf2Node , AnyOf2 , 2 , child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2);
+impl_one_of!(OneOf3 , OneOf3Node , AnyOf3 , 3 , child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3);
+impl_one_of!(OneOf4 , OneOf4Node , AnyOf4 , 4 , child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4);
+impl_one_of!(OneOf5 , OneOf5Node , AnyOf5 , 5 , child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5);
+impl_one_of!(OneOf6 , OneOf6Node , AnyOf6 , 6 , child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6);
+impl_one_of!(OneOf7 , OneOf7Node , AnyOf7 , 7 , child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6, child7 | Child7 | ok7 | Ok7);
+impl_one_of!(OneOf8 , OneOf8Node , AnyOf8 , 8 , child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6, child7 | Child7 | ok7 | Ok7, child8 | Child8 | ok8 | Ok8);
+impl_one_of!(OneOf9 , OneOf9Node , AnyOf9 , 9 , child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6, child7 | Child7 | ok7 | Ok7, child8 | Child8 | ok8 | Ok8, child9 | Child9 | ok9 | Ok9);
 impl_one_of!(OneOf10, OneOf10Node, AnyOf10, 10, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6, child7 | Child7 | ok7 | Ok7, child8 | Child8 | ok8 | Ok8, child9 | Child9 | ok9 | Ok9, child10 | Child10 | ok10 | Ok10);
 impl_one_of!(OneOf11, OneOf11Node, AnyOf11, 11, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6, child7 | Child7 | ok7 | Ok7, child8 | Child8 | ok8 | Ok8, child9 | Child9 | ok9 | Ok9, child10 | Child10 | ok10 | Ok10, child11 | Child11 | ok11 | Ok11);
 impl_one_of!(OneOf12, OneOf12Node, AnyOf12, 12, child1 | Child1 | ok1 | Ok1, child2 | Child2 | ok2 | Ok2, child3 | Child3 | ok3 | Ok3, child4 | Child4 | ok4 | Ok4, child5 | Child5 | ok5 | Ok5, child6 | Child6 | ok6 | Ok6, child7 | Child7 | ok7 | Ok7, child8 | Child8 | ok8 | Ok8, child9 | Child9 | ok9 | Ok9, child10 | Child10 | ok10 | Ok10, child11 | Child11 | ok11 | Ok11, child12 | Child12 | ok12 | Ok12);
