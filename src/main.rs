@@ -2,6 +2,7 @@ mod parser;
 mod compiler;
 mod symex;
 
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 //use equation_solver::*;
@@ -45,7 +46,7 @@ fn run_parser(filename: String) {
             let mut engine = Vec::new();
             //println!("{:?}", value);
             //println!("{:?}", );
-            let _result = value.execute(text, &mut engine, 0);
+            let _result = value.execute(text, &mut engine, HashSet::from([0]));
             let mut i = 0;
             while i < engine.len() {
                 //println!("{}", i);

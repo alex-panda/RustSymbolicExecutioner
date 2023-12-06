@@ -3,7 +3,9 @@ use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort}
 use crate::symex::{SymVar, SymSolver, SymExEngine};
 use std::ops::Deref;
 
-pub fn new_engine(engines: &mut Vec<SymExEngine>) {
+pub fn new_engine(engines: &mut Vec<SymExEngine>) -> usize {
+    let id = engines.len();
+
     let mut init_engine = || -> Result<(), Box<dyn std::error::Error>> {
         let mut e = SymExEngine {
             pi: SymSolver::new(),
@@ -14,9 +16,12 @@ pub fn new_engine(engines: &mut Vec<SymExEngine>) {
         engines.push(e);
         Ok(())
     };
+
     if let Err(_err) = init_engine() {
         println!("Failed to initialize symbolic execution engine.");
     }
+
+    id
 }
 
 pub fn clone_engine(engines: &mut Vec<SymExEngine>, path: usize) {

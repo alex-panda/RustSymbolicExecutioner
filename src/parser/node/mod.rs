@@ -22,6 +22,9 @@ pub use funnel::*;
 mod trace;
 pub use trace::*;
 
+mod ojoin;
+pub use ojoin::*;
+
 mod join;
 pub use join::*;
 

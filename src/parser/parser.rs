@@ -1,6 +1,6 @@
-use std::fmt::Display;
+use std::{fmt::Display, collections::HashSet};
 
-use crate::{parser::{ParseContext, Not, AnyV, Funnel4, AnyMemTable, Funnel6, Join, Funnel2, OneOf8, MapPValue, Funnel9, LRJoin, Funnel3, Funnel8, OneOf11, RLJoin, Funnel12, Funnel, AnyOf4, AnyOf11, AnyOf8}, srule, symex::{SymExEngine, self, new_assert}};
+use crate::{parser::{ParseContext, Not, AnyV, Funnel4, AnyMemTable, Funnel6, Join, Funnel2, OneOf8, MapPValue, Funnel9, LRJoin, Funnel3, Funnel8, OneOf11, RLJoin, Funnel12, Funnel, AnyOf4, AnyOf11, AnyOf8, OJoin}, srule, symex::{SymExEngine, self, new_assert}};
 
 use super::{ParseResult, Span, ZeroOrMore, ParseNode, SpanOf, Map, OneOf3, Spanned, OneOrMore, AnyOf3, Maybe, AnyOf2, MapV, OneOf6, Leader, Surround, End, Req, OneOf5, OneOf4, OneOf2, ParsePos, ParseStore};
 
@@ -95,6 +95,7 @@ type ExErr = ();
 pub struct ExOk {
     pub cont: bool,
     pub res: Vec<SymexRes>,
+    pub continues: HashSet<usize>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -106,118 +107,138 @@ pub struct SymexRes {
 type ReturnResult = Result<ExOk, ExErr>;
 
 pub trait Execute<Store: ParseStore<PPos, char> + ?Sized> {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr>;
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr>;
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RCrate {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
         let mut results = Vec::new();
+
         for item in self.items.iter() {
-            let res = item.execute(store, engine, id)?;
+            let res = item.execute(store, engine, HashSet::new())?;
             results.extend(res.res);
         }
-        Ok(ExOk { cont: true, res: results })
+
+        Ok(ExOk { cont: true, res: results, continues: HashSet::new() })
     }
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RItem {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
         match self {
-            RItem::Fn {span, vis, val} => val.execute(store, engine, id),
+            RItem::Fn {span, vis, val}
+                => val.execute(store, engine, ids),
         }
     }
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RFn {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
-        symex::new_engine(engine);
-        let id = engine.len() - 1;
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
+        let mut ids = HashSet::from([symex::new_engine(engine)]);
+
         // add the params
         for arg in &self.args {
-            arg.execute(store, engine, id)?;
+            arg.execute(store, engine, ids.clone())?;
         }
-        // executet he body now that we have the params
-        self.body.execute(store, engine, id)
+
+        // execute the body now that we have the params
+        let mut res = self.body.execute(store, engine, ids)?;
+        res.continues.clear();
+        Ok(res)
     }
 }
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RBlock {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
         let mut results = Vec::new();
-        for stmt in &self.statements {
-            let res = stmt.execute(store, engine, id)?;
-            results.extend(res.res);
-            if !res.cont {
-                break;
+        let mut continues = ids.clone();
+
+        for id in ids {
+            let mut internal_continues = HashSet::from([id]);
+
+            for stmt in &self.statements {
+                let res = stmt.execute(store, engine, internal_continues.clone())?;
+                results.extend(res.res);
+                internal_continues.extend(res.continues.clone());
+                continues.extend(res.continues);
+                if !res.cont {
+                    break;
+                }
             }
         }
-        return Ok(ExOk { cont: true, res: results });
+
+        return Ok(ExOk { cont: true, res: results, continues });
     }
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RStatement {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
         use RStatement::*; 
         match self {
             Comment{comment} => {
                 match comment {
                     RComment::Symex { symex, .. } => {
-                        engine[id].reached_symex = true;
-                        let mut vec = Vec::new();
-                        println!("{}", engine[id].to_string());
-                        vec.push(SymexRes {
-                            symex_pos: symex.clone(),
-                            res: engine[id].to_string()
-                        });
+                        let mut res = Vec::new();
+
+                        for id in ids {
+                            engine[id].reached_symex = true;
+
+                            res.push(SymexRes {
+                                symex_pos: symex.clone(),
+                                res: engine[id].to_string()
+                            });
+                        }
                         
-                        return Ok(ExOk { cont: true, res: vec });
+                        return Ok(ExOk { cont: true, res, continues: HashSet::new() });
                     },
-                    _ => Ok(ExOk { cont: true, res: Vec::new() }),
+                    _ => Ok(ExOk { cont: true, res: Vec::new(), continues: HashSet::new() }),
                 }
             },
-            Expr {expr, semi} => expr.execute(store, engine, id),
+            Expr {expr, semi} => expr.execute(store, engine, ids),
             Return { expr, .. } => {
-                let mut res = expr.execute(store, engine, id)?;
+                let mut res = expr.execute(store, engine, ids)?;
                 res.cont = false;
                 Ok(res)
             },
-            SColon { .. } => Ok(ExOk { cont: true, res: Vec::new() }),
-            If {stmt} => stmt.execute(store, engine, id),
-            Loop {stmt} => stmt.execute(store, engine, id),
+            SColon { .. } => Ok(ExOk { cont: true, res: Vec::new(), continues: HashSet::new() }),
+            If {stmt} => stmt.execute(store, engine, ids),
+            Loop {stmt} => stmt.execute(store, engine, ids),
             Assign {ident, ty, equal_value,..} => {
-                engine[id].new_variable_assign(
-                    ident.into_string(store),
-                    ty.clone().map(|v|v.into_string(store)).unwrap_or_else(||"i32".to_string()),
-                    equal_value.span().into_string(store),
-                    equal_value.into_lisp(store)
-                );
+                for id in ids {
+                    engine[id].new_variable_assign(
+                        ident.into_string(store),
+                        ty.clone().map(|v|v.into_string(store)).unwrap_or_else(||"i32".to_string()),
+                        equal_value.span().into_string(store),
+                        equal_value.into_lisp(store)
+                    );
+                }
 
-                Ok(ExOk { cont: true, res: Vec::new() })
+                Ok(ExOk { cont: true, res: Vec::new(), continues: HashSet::new() })
             }
         }
-
-
     }
 }
 
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RParam {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
-        engine[id].new_variable(self.id.into_string(store), self.ty.into_string(store));
-        return Ok(ExOk { cont: true, res: Vec::new() });
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
+        for id in ids {
+            engine[id].new_variable(self.id.into_string(store), self.ty.into_string(store));
+        }
+        return Ok(ExOk { cont: true, res: Vec::new(), continues: HashSet::new() });
     }
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RExpr {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
         use RExpr::*;
         match self {
             Lit(_) => {},
             Var(_) => {},
             Path(_, _) => {},
-            Group { expr, .. } => return expr.execute(store, engine, id),
-            Block(b) => return b.execute(store, engine, id),
-            If(i) => return i.execute(store, engine, id),
-            Loop(l) => return l.execute(store, engine, id),
+            Group { expr, .. } => return expr.execute(store, engine, ids),
+            Block(b) => return b.execute(store, engine, ids),
+            If(i) => return i.execute(store, engine, ids),
+            Loop(l) => return l.execute(store, engine, ids),
             Call { span, ident, args } => {},
             Deref { span, star, expr } => {},
             Borrow { span, and, expr } => {},
@@ -225,44 +246,46 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RExpr {
             Negate { span, neg, expr } => {},
             Not { span, not, expr } => {},
             AssignOp { span, left, op, op_span, right } => {
-                engine[id].assign_symvar_value(
-                    right.span().into_string(store),
-                    left.span().into_string(store),
-                    right.into_lisp(store)
-                );
+                for id in ids {
+                    engine[id].assign_symvar_value(
+                        right.span().into_string(store),
+                        left.span().into_string(store),
+                        right.into_lisp(store)
+                    );
+                }
             },
-            BinOp { span, left, op, op_span, right } => {},
+            BinOp { span, left, op, op_span, right } => { },
         }       
-        Ok(ExOk { cont: true, res: Vec::new() })
+        Ok(ExOk { cont: true, res: Vec::new(), continues: HashSet::new() })
     }
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RIf {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
-        match self {
-            RIf::If { prev, expr, block, .. } => {
-                let mut res = ExOk { cont: true, res: Vec::new() };
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
+        let mut res = ExOk { cont: true, res: Vec::new(), continues: HashSet::new() };
 
-                let path_id = new_assert(engine, id, expr.span().into_string(store), expr.into_lisp(store));
-                res.res.extend(block.execute(store, engine, path_id)?.res);
-                if let Some(prev) = prev {
-                    res = prev.execute(store, engine, id)?;
-                }
+        for bad_path in ids {
+            for (expr, block) in self.ifs.iter() {
+                let good_path = new_assert(engine, bad_path, expr.span().into_string(store), expr.into_lisp(store));
+                let result = block.execute(store, engine, HashSet::from([good_path]))?;
+                res.res.extend(result.res);
+                res.continues.extend(result.continues);
+            }
 
-                Ok(res)
-            },
-            RIf::Else { prev, block, .. } => {
-                let mut res = prev.execute(store, engine, id)?;
-                res.res.extend(block.execute(store, engine, id)?.res);
-                Ok(res)
-            },
+            if let Some(block) = &self.else_stmt {
+                let result = block.execute(store, engine, HashSet::from([bad_path]))?;
+                res.res.extend(result.res);
+                res.continues.extend(result.continues);
+            }
         }
+
+        Ok(res)
     }
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RLoop {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: usize) -> Result<ExOk, ExErr> {
-        Ok(ExOk { cont: true, res: Vec::new() })
+    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: HashSet<usize>) -> Result<ExOk, ExErr> {
+        Ok(ExOk { cont: true, res: Vec::new(), continues: HashSet::new() })
     }
 }
 
@@ -314,32 +337,18 @@ pub struct RBlock {
 /// An if statement or chain of if statments.
 /// 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum RIf {
-    If {
-        span: Span<PPos>,
-        /// The previous if statement (if there is one) in the chain of if
-        /// statements. Only if its expression returns `false` can this if
-        /// statement check its own expression.
-        prev: Option<Box<RIf>>,
-        /// The expression that must resolve to a boolean
-        expr: RExpr,
-        /// The block of code to run if the expression evaluates to `true`.
-        block: RBlock
-    },
-    Else {
-        span: Span<PPos>,
-        prev: Box<RIf>,
-        block: RBlock,
-    }
+pub struct RIf {
+    /// The span of the `RIf`.
+    span: Span<PPos>,
+    /// The list of if statements.
+    ifs: Vec<(RExpr, RBlock)>,
+    /// The optional else block to run if all if statements fail.
+    else_stmt: Option<RBlock>
 }
 
 impl RIf {
     pub fn span(&self) -> Span<PPos> {
-        use RIf::*;
-        match self {
-            If { span, .. } => span.clone(),
-            Else { span, .. } => span.clone(),
-        }
+        self.span.clone()
     } 
 }
 
@@ -1932,41 +1941,25 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         ),
     );
 
-    if_statement_rule.set(MapV(Spanned(Leader(
-            "if", (w, expr, w, block,
-                Maybe((w, Leader("else", (w, OneOf2(block, if_statement)),
-                    |_, pos, _| panic(pos, "if_statement", "expected code block after this \"else\"")
-                )))
-            ),
-            |_, pos, _| panic(pos, "if_statement", "expected expression and body of the if statement after this \"if\" keyword")
-        )),
-        |(span, (_, (_, expr, _, block, maybe_else)))| {
-            let iff = RIf::If { span: span.clone(), prev: None, expr, block };
+//     Spanned(Leader(
+//            "if", (w, expr, w, block,
+//                Maybe((w, Leader("else", (w, OneOf2(block, if_statement)),
+//                    |_, pos, _| panic(pos, "if_statement", "expected code block after this \"else\"")
+//                )))
+//            )
 
-            if let Some((_, (_, (_, choice)))) = maybe_else {
-                use AnyOf2::*;
-                match choice {
-                    Child1(block) => {
-                        RIf::Else {
-                            span,
-                            prev: Box::new(iff),
-                            block,
-                        }
-                    },
-                    Child2(if_stmt) => {
-                        match if_stmt {
-                            RIf::If { span, prev: _, expr, block } => {
-                                RIf::If { span, prev: Some(Box::new(iff)), expr, block }
-                            },
-                            RIf::Else { span, prev: _, block } => { 
-                                RIf::Else { span, prev: Box::new(iff), block }
-                             }
-                        }
-                    },
-                }
-            } else {
-                iff
-            }
+    if_statement_rule.set(MapV(Spanned((
+            OJoin(
+                MapV(
+                    Leader("if", (w, expr, w, block), |_, pos, _| panic(pos, "if_statement", "expected expression and body of the if statement after this \"if\" keyword")),
+                    |(_, (_, expr, _, block))| (expr, block) 
+                ),
+                (w, "else", w)
+            ),
+            Maybe(MapV((w, "else", w, block), |(_, _, _, block)| block))
+        )),
+        |(span, (ifs, else_stmt))| {
+            RIf { span, ifs, else_stmt }
         }
     ));
 
@@ -2087,6 +2080,8 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use crate::parser::parser::{RCrate, RFn, Execute};
 
     use super::parse_file;
@@ -2301,7 +2296,7 @@ fn s2_ifStmt(mut x:i32, mut y:i32) -> i32 {
                 //println!("{}: {:?}", advance, value);
                 let mut engine = Vec::new();
                 println!("{:?}", value);
-                println!("{:?}", value.execute(test, &mut engine, 0));
+                println!("{:?}", value.execute(test, &mut engine, HashSet::from([0])));
             },
             Error(error) => panic!("Error: {}", error),
             Panic(error) => panic!("Panic: {}", error),
@@ -2336,14 +2331,22 @@ fn s_if(mut x:i32, mut y:i32) -> i32 {
                 let mut engine = Vec::new();
                 //println!("{:?}", value);
                 //print!("{:?}", value.execute(s, &mut engine, 0));
-                let _result = value.execute(s, &mut engine, 0);
+                let result = value.execute(s, &mut engine, HashSet::from([0]));
+                match result {
+                    Ok(ok) => {
+                        for res in ok.res.iter() {
+                            println!("{}: {}", res.symex_pos, res.res);
+                        }
+                    },
+                    Err(_) => panic!("Error!"),
+                }
                 //let mut i = 0;
                 //while i < engine.len() {
                     //println!("{}", i);
                 //    if engine[i].pi.satisfiable && engine[i].reached_symex {
                 //      println!("{}", engine[i].to_string());
                 //    }
-                //    i = i + 1;
+                //   // = i + 1;
                 //}
             },
             Error(error) => panic!("Error: {}", error),
