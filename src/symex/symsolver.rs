@@ -9,6 +9,7 @@ pub struct SymSolver {
     pub pi_str: String,
     int_str: String,
     assert_str: String,
+    pub satisfiable: bool,
 }
 
 
@@ -17,9 +18,10 @@ impl SymSolver {
         
         SymSolver {
             s: SmtConf::z3(PATH_TO_SOLVER).spawn(()).unwrap(),
-            pi_str: "true".to_string(),
+            pi_str: "".to_string(),
             int_str: "".to_string(),
             assert_str: "".to_string(),
+            satisfiable: true,
         }
     }
 
@@ -48,7 +50,8 @@ impl SymSolver {
             s: s,
             pi_str: self.pi_str.clone(),
             int_str: self.int_str.clone(),
-            assert_str: self.assert_str.clone()
+            assert_str: self.assert_str.clone(),
+            satisfiable: self.satisfiable.clone(),
         }
     }
     pub fn add_assertion_to_solver(&mut self, assert: &String) {
@@ -59,10 +62,13 @@ impl SymSolver {
         match is_sat {
             Ok(b, ..) => {
                 if !b{
-                    self.pi_str = format!("{}#{}", self.pi_str, "Path assertions not valid");
+                    self.satisfiable = false;
                 }
             }, 
-            Err(E) => self.pi_str = format!("{}#{}", self.pi_str, "Path assertions not valid"),
+            Err(E) => {
+                println!("Error when attempting to assert {} with Z3", assert);
+                self.satisfiable = false;
+            },
         }   
     }
     pub fn load_solver(&self) -> Solver<()> {

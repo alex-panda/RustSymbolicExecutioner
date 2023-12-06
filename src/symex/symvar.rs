@@ -33,7 +33,8 @@ impl SymVar {
     }
 
     pub fn to_string(&self) -> String {
-        format!("{} = {}; range {}..{}", &self.name, &self.var0, &self.min, &self.max)
+        format!("{} in var0 = {};", &self.name, &self.var0)
+        //format!("{} in var0 = {}; range {}..{}", &self.name, &self.var0, &self.min, &self.max)
     }
 
     fn set_min(t: String) -> i128 {

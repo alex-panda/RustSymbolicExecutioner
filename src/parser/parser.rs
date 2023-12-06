@@ -161,11 +161,13 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RStatement {
             Comment{comment} => {
                 match comment {
                     RComment::Symex { symex, .. } => {
+                        engine[id].reached_symex = true;
                         let mut vec = Vec::new();
                         vec.push(SymexRes {
                             symex_pos: symex.clone(),
                             res: engine[id].to_string()
                         });
+                        
                         return Ok(ExOk { cont: true, res: vec });
                     },
                     _ => Ok(ExOk { cont: true, res: Vec::new() }),
@@ -2393,13 +2395,15 @@ fn s_if(mut x:i32, mut y:i32) -> i32 {
         match parse_file(s) {
             Okay(value, _) => {
                 let mut engine = Vec::new();
-                println!("{:?}", value);
-                println!("{:?}", value.execute(s, &mut engine, 0));
-
+                //println!("{:?}", value);
+                //println!("{:?}", );
+                value.execute(s, &mut engine, 0);
                 let mut i = 0;
                 while i < engine.len() {
                     //println!("{}", i);
-                    println!("{}", engine[i].to_string());
+                    if engine[i].pi.satisfiable && engine[i].reached_symex {
+                      println!("{}", engine[i].to_string());
+                    }
                     i = i + 1;
                 }
             },

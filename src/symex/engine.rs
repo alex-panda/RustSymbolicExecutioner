@@ -6,6 +6,7 @@ pub struct SymExEngine {
     pub pi: SymSolver,
     pub sigma: Vec<SymVar>,
     pub path: u32,
+    pub reached_symex: bool,
 }
 
 pub fn eval(stmt_rs: String) -> String {
@@ -35,7 +36,7 @@ impl SymExEngine {
             s = s + "\t" + &self.sigma[i].to_string() + "\n";
             i = i + 1;
         }
-        format!("path: {}\npi: {}\nsigma: {}", &self.path, &self.pi.to_string(), s)
+        format!("path: {}\npi: {} {}\nsigma: {}", &self.path, &self.pi.satisfiable.to_string(), &self.pi.to_string(), s)
     }
 
     //creates symvar from function header
@@ -83,11 +84,11 @@ impl SymExEngine {
         while i < self.sigma.len() {
             let f = &self.sigma[i].name.eq(&self.sigma[i].var0);
             if stmt.contains(&self.sigma[i].name) && !f {
-                let s = format!("{}", self.sigma[i].var0);
+                let s = format!("{}", self.sigma[i].lisp_var0);
                 stmt = stmt.replace(&self.sigma[i].name, &s);
             }
             else if *f {
-                let s = format!("{}", self.sigma[i].var0);
+                let s = format!("{}", self.sigma[i].lisp_var0);
                 
                 stmt = stmt.replace(&self.sigma[i].name, &s);
             }
@@ -108,7 +109,7 @@ impl SymExEngine {
                 found = true;
                 self.sigma[j].prev = self.sigma[j].var0.clone();
                 self.sigma[j].var0 = eval(stmt_rs.clone());
-                self.sigma[j].var0 = lisp_rs.clone();
+                self.sigma[j].lisp_var0 = lisp_rs.clone();
                 self.sort_symvar(j);
             }
             j = j + 1;

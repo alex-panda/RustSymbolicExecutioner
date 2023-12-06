@@ -41,13 +41,23 @@ fn run_parser(filename: String) {
     let t = fs::read_to_string(filename).expect("Could not read");
     let text = t.as_str();
     match parse_file(text) {
-        Okay(value, advance) => {
+        Okay(value, _) => {
             let mut engine = Vec::new();
-            println!("{:?}", value.execute(text, &mut engine, 0));
+            //println!("{:?}", value);
+            //println!("{:?}", );
+            let _result = value.execute(text, &mut engine, 0);
+            let mut i = 0;
+            while i < engine.len() {
+                //println!("{}", i);
+                if engine[i].pi.satisfiable && engine[i].reached_symex {
+                  println!("{}", engine[i].to_string());
+                }
+                i = i + 1;
+            }
         },
         Error(error) => panic!("Error: {}", error),
         Panic(error) => panic!("Panic: {}", error),
-    }
+        }
 }
 
 #[cfg(test)] 

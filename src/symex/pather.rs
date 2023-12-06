@@ -9,6 +9,7 @@ pub fn new_engine(engines: &mut Vec<SymExEngine>) {
             pi: SymSolver::new(),
             sigma: Vec::new(),
             path: engines.len() as u32,
+            reached_symex: false,
         };
         engines.push(e);
         Ok(())
@@ -24,6 +25,7 @@ pub fn clone_engine(engines: &mut Vec<SymExEngine>, path: usize) {
             pi: SymSolver::copy_solver(&engines[path].pi),
             sigma: (*engines[path].sigma).to_vec(),
             path: engines.len() as u32,
+            reached_symex: engines[path].reached_symex.clone(),
         };
         engines.push(e);
         Ok(())
@@ -38,6 +40,8 @@ pub fn new_assert(e: &mut Vec<SymExEngine>, path: usize, assert: String, lisp: S
     //println!("new assert");
     let l = e.len();
     clone_engine(e, path);
+    //println!("asserting {}", assert.clone());
+    //println!("asserting l {}", lisp.clone());
     
     e[l].new_assertion(assert.clone(), lisp.clone());
     let neg_assert = "!".to_owned() + &assert.clone();
