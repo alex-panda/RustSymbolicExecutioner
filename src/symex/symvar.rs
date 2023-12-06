@@ -2,6 +2,7 @@
 pub struct SymVar {
     pub name: String,
     pub var0: String,
+    pub lisp_var0: String,
     pub min: i128,
     pub max: u128,
     pub prev: String,
@@ -13,16 +14,18 @@ impl SymVar {
         SymVar {
             name: s.clone(),
             var0: s.clone(),
+            lisp_var0: s.clone(),
             min: Self::set_min(t.clone()),
             max: Self::set_max(t.clone()),
             prev: s.clone()
         }
     }
 
-    pub fn new_assign(s: String, t: String, assign: String) -> Self {
+    pub fn new_assign(s: String, t: String, assign: String, l_assign: String) -> Self {
         SymVar {
             name: s.clone(),
             var0: assign.clone(),
+            lisp_var0: l_assign.clone(),
             min: Self::set_min(t.clone()),
             max: Self::set_max(t.clone()),
             prev: assign.clone()

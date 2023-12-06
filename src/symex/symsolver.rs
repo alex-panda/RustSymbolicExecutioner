@@ -1,6 +1,9 @@
 static PATH_TO_SOLVER:&str = "z3\\bin\\z3.exe";
 use rsmt2::*;
 use std::rc::Rc;
+
+use crate::symex::engine;
+
 pub struct SymSolver {
     pub s: Solver<()>,
     pub pi_str: String,
@@ -52,10 +55,15 @@ impl SymSolver {
         println!("asserting {}", assert.clone());
         self.s.assert(assert.clone()).unwrap();
         self.assert_str = format!("{}#{}", self.assert_str, assert.clone());
-        let is_sat = self.s.check_sat().unwrap();
-        if !is_sat {
-            self.assert_str = format!("{}#{}", self.assert_str, "Path assertions not valid");
-        }
+        let is_sat = self.s.check_sat();
+        match is_sat {
+            Ok(b, ..) => {
+                if !b{
+                    self.assert_str = format!("{}#{}", self.assert_str, "Path assertions not valid");
+                }
+            }, 
+            Err(E) => self.assert_str = format!("{}#{}", self.assert_str, "Path assertions not valid"),
+        }   
     }
     pub fn load_solver(&self) -> Solver<()> {
         let mut s = SmtConf::z3(PATH_TO_SOLVER).spawn(()).unwrap();

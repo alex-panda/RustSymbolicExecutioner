@@ -49,10 +49,10 @@ impl SymExEngine {
 
     //creates symvar from initialization
     //ie let var_name: var_type = assign;
-    pub fn new_variable_assign(&mut self, var_name: String, var_type: String, assign: String) {
+    pub fn new_variable_assign(&mut self, var_name: String, var_type: String, assign: String, l_assign: String) {
         let a = assign.replace(";", "");
         let stmt = self.display_as_var0(a);
-        let v = SymVar::new_assign(var_name.clone(), var_type.clone(), eval(stmt.clone()));
+        let v = SymVar::new_assign(var_name.clone(), var_type.clone(), eval(stmt.clone()), l_assign);
         //println!("created {} of type {} with value {}", var_name.clone(), var_type.clone(), assign.clone());
         self.sigma.push(v);
         self.pi.add_int(var_name.clone())
@@ -78,9 +78,29 @@ impl SymExEngine {
         return stmt;
     }
 
-    pub fn assign_symvar_value(&mut self, mut stmt_rs: String, stmt_ls: String) {
+    pub fn lisp_as_var0(&mut self, mut stmt: String) -> String {
+        let mut i = 0;
+        while i < self.sigma.len() {
+            let f = &self.sigma[i].name.eq(&self.sigma[i].var0);
+            if stmt.contains(&self.sigma[i].name) && !f {
+                let s = format!("{}", self.sigma[i].var0);
+                stmt = stmt.replace(&self.sigma[i].name, &s);
+            }
+            else if *f {
+                let s = format!("{}", self.sigma[i].var0);
+                
+                stmt = stmt.replace(&self.sigma[i].name, &s);
+            }
+            i = i + 1;
+        }
+        println!("{}", stmt);
+        return stmt;
+    }
+
+    pub fn assign_symvar_value(&mut self, mut stmt_rs: String, stmt_ls: String, mut lisp_rs: String) {
         //println!("{} = {}", stmt_ls.clone(), stmt_rs.clone());
         stmt_rs = self.display_as_var0(stmt_rs);
+        lisp_rs = self.lisp_as_var0(lisp_rs);
         let mut j = 0;
         let mut found = false;
         while j < self.sigma.len() {
@@ -88,6 +108,7 @@ impl SymExEngine {
                 found = true;
                 self.sigma[j].prev = self.sigma[j].var0.clone();
                 self.sigma[j].var0 = eval(stmt_rs.clone());
+                self.sigma[j].var0 = lisp_rs.clone();
                 self.sort_symvar(j);
             }
             j = j + 1;
@@ -100,9 +121,10 @@ impl SymExEngine {
     pub fn new_assertion(&mut self, a: String, lisp: String) {
         let assert = a.replace(";", "");
         let var0_assert = self.display_as_var0(assert.clone());
+        let lisp_assert =  self.lisp_as_var0(lisp.clone());
         let and_assert = " && ".to_owned() + &var0_assert;
         self.pi.add_assertion_to_pi_str(&and_assert);
-        self.pi.add_assertion_to_solver(&lisp);
+        self.pi.add_assertion_to_solver(&lisp_assert);
     }
 
 

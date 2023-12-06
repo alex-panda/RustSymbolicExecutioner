@@ -184,7 +184,8 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RStatement {
                 engine[id].new_variable_assign(
                     ident.into_string(store),
                     ty.clone().map(|v|v.into_string(store)).unwrap_or_else(||"i32".to_string()),
-                    equal_value.span().into_string(store)
+                    equal_value.span().into_string(store),
+                    equal_value.into_lisp(store)
                 );
 
                 Ok(ExOk { cont: true, res: Vec::new() })
@@ -223,7 +224,8 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RExpr {
             AssignOp { span, left, op, op_span, right } => {
                 engine[id].assign_symvar_value(
                     right.span().into_string(store),
-                    left.span().into_string(store)
+                    left.span().into_string(store),
+                    right.into_lisp(store)
                 );
             },
             BinOp { span, left, op, op_span, right } => {},
@@ -2380,7 +2382,8 @@ fn s_if(mut x:i32, mut y:i32) -> i32 {
         y = y + 3;
     }
 
-    if y != 6 {
+    y = 5;
+    if y == 6 {
         x = 5;
     }
     
