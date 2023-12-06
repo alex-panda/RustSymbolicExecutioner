@@ -167,6 +167,7 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RStatement {
                             symex_pos: symex.clone(),
                             res: engine[id].to_string()
                         });
+                        println!("{}", engine[id].to_string());
                         
                         return Ok(ExOk { cont: true, res: vec });
                     },
@@ -2385,8 +2386,10 @@ fn s_if(mut x:i32, mut y:i32) -> i32 {
     x = y * 2;
     if x == 6 {
         y = y + 3;
+        //symex
     }
     else {
+        //symex
         y = y + 4;
     }
     //symex
@@ -2396,16 +2399,16 @@ fn s_if(mut x:i32, mut y:i32) -> i32 {
             Okay(value, _) => {
                 let mut engine = Vec::new();
                 //println!("{:?}", value);
-                //println!("{:?}", );
-                value.execute(s, &mut engine, 0);
-                let mut i = 0;
-                while i < engine.len() {
-                    //println!("{}", i);
-                    if engine[i].pi.satisfiable && engine[i].reached_symex {
-                      println!("{}", engine[i].to_string());
-                    }
-                    i = i + 1;
-                }
+                //print!("{:?}", value.execute(s, &mut engine, 0));
+                let _result = value.execute(s, &mut engine, 0);
+                //let mut i = 0;
+                //while i < engine.len() {
+                 //   //println!("{}", i);
+                //    if engine[i].pi.satisfiable && engine[i].reached_symex {
+                 //     println!("{}", engine[i].to_string());
+                  //  }
+                   // i = i + 1;
+                //}
             },
             Error(error) => panic!("Error: {}", error),
             Panic(error) => panic!("Panic: {}", error),
