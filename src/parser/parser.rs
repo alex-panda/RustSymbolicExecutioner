@@ -1187,9 +1187,7 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     srule!(ascii, ascii_rule);
     srule!(dec_digit, dec_digit_rule);
     srule!(bin_digit, bin_digit_rule);
-    srule!(tuple_index, tuple_index_rule);
     srule!(float_exponent, float_exponent_rule);
-    srule!(reserved_number, reserved_number_rule);
 
     srule!(return_statement, return_statement_rule);
     srule!(let_statement, let_statement_rule);
@@ -1216,25 +1214,22 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
     srule!(block_comment_or_doc, block_comment_or_doc_rule);
 
     // define function to produce "panic" uniform messages of parse
-    let panic_fn = |pos: Span<PPos>, fn_name: &str, message: &str| -> String {
+    let panic = &|pos: Span<PPos>, fn_name: &str, message: &str| -> String {
         format!("{}: ({}) {}", pos, fn_name, message)
     };
-    let panic = &panic_fn;
 
     // IDENTIFIERS
 
-    let isolated_cr = SpanOf(('\r', Not('\n')));
-    let isolated_cr = &isolated_cr;
+    let isolated_cr = &SpanOf(('\r', Not('\n')));
 
     // unicode groups
-    let xid_start = MapPValue(|span, ch| {
+    let xid_start = &MapPValue(|span, ch| {
         if UnicodeXID::is_xid_start(ch) {
             Okay(span.clone(), span.end)
         } else {
             Error(panic(span, "xid_start", "expected character in the [:XID_Start:] unicode group"))
         }
     });
-    let xid_start = &xid_start;
 
 //    let xid_continue = MapPValue(|span, ch| {
 //        if UnicodeXID::is_xid_continue(ch) {
@@ -1627,8 +1622,6 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         97..=102 // lower case
     )));
 
-    tuple_index_rule.set(integer_literal);
-
     // - FLOAT LITERALS -
 
     float_literal_rule.set(MapV(
@@ -1660,66 +1653,6 @@ pub fn parse_file(file_text: &str) -> ParseResult<RCrate, String, PPos> {
         dec_digit,
         ZeroOrMore(OneOf2(dec_digit, '_'))
     )));
-
-    reserved_number_rule.set(Map(
-        Spanned(OneOf8(
-            (bin_literal, '2'..='9'),
-            (oct_literal, '8'..='9'),
-            (
-                OneOf3(
-                    bin_literal,
-                    oct_literal,
-                    hex_literal
-                ),
-                '.',
-                Not(OneOf3('.', '_', xid_start))
-            ),
-            (
-                OneOf2(bin_literal, oct_literal),
-                Funnel(['e', 'E'])
-            ),
-            (
-                "0b",
-                ZeroOrMore('_'),
-                OneOf2(
-                    End(),
-                    (Not(bin_digit), AnyV())
-                )
-            ),
-            (
-                "0o",
-                ZeroOrMore('_'),
-                OneOf2(
-                    End(),
-                    (Not(oct_digit), AnyV())
-                )
-            ),
-            (
-                "0x",
-                ZeroOrMore('_'),
-                OneOf2(
-                    End(),
-                    (Not(hex_digit), AnyV())
-                )
-            ),
-            (
-                dec_literal,
-                Maybe(('.', dec_literal)),
-                OneOf2('e', 'E'),
-                Maybe(OneOf2('+', '-')),
-                OneOf2(
-                    End(),
-                    (Not(dec_digit), AnyV())
-                )
-            )
-        )),
-        |res| {
-            (match res {
-                Okay((span, _), _) => Panic(panic(span, "reserved_number", "this number is reserved and cannot be used")),
-                res => res
-            }).map_value(|_|())
-        }
-    ));
 
     // - BOOLEAN LITERAL -
 
