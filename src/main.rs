@@ -17,22 +17,19 @@ use ParseResult::*;
 //static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
 
 fn main() {
-    
     let args: Vec<String> = env::args().collect();
+
     if args.len() != 2 {
         println!("File name expected");
         return;
     }
-    let filename = args[1].clone();
 
+    let filename = args[1].clone();
 
     let valid = compiler::compile_input(&filename);
         if valid {
            run_parser(filename);
-
-        }
-
-        else {
+        } else {
             println!("Could not compile");
         }
 }
@@ -44,12 +41,9 @@ fn run_parser(filename: String) {
     match parse_file(text) {
         Okay(value, _) => {
             let mut engine = Vec::new();
-            //println!("{:?}", value);
-            //println!("{:?}", );
             let _result = value.execute(&mut engine, parser::parser::ExecuteArgs { store: text, ids: HashSet::from([0]), max_loop_iter: 100 });
             let mut i = 0;
             while i < engine.len() {
-                //println!("{}", i);
                 if engine[i].pi.satisfiable && engine[i].reached_symex {
                   println!("{}", engine[i].to_string());
                 }

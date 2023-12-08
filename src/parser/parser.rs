@@ -359,9 +359,12 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RLoop {
             },
             RLoop::While { span, expr, block } => {
                 for bad_path in args.ids.iter().map(|v|*v) {
+                    let mut curr_path = bad_path;
                     for i in 0..args.max_loop_iter {
-                        let good_path = new_assert(engine, bad_path, expr.span().into_string(args.store), expr.into_lisp(args.store));
+                        let good_path = new_assert(engine, curr_path, expr.span().into_string(args.store), expr.into_lisp(args.store));
                         res.continues.insert(good_path);
+                        curr_path = good_path;
+
                         if engine[good_path].pi.satisfiable {
                             let result = block.execute(engine, args.clone().with_ids(HashSet::from([good_path])))?;
                             res.res.extend(result.res);
@@ -2178,7 +2181,7 @@ mod tests {
 
     use crate::parser::parser::{RCrate, RFn, Execute};
 
-    use super::{parse_file, ExecuteArgs};
+    use super::{parse_file, ExecuteArgs, SymexRes, ExOk};
     use super::super::ParseResult;
     use ParseResult::*;
     use super::PPos;
@@ -2267,6 +2270,18 @@ mod tests {
             },
             Error(error) => panic!("Error: {}", error),
             Panic(error) => panic!("Panic: {}", error),
+        }
+    }
+
+    fn print_res(res: Result<ExOk, ()>) {
+        match res {
+            Ok(ok) => {
+                for res in ok.res.iter() {
+                    println!("{}", res);
+                }
+                println!("Total Results: {}", ok.res.len());
+            },
+            Err(_) => println!("error!"),
         }
     }
 
@@ -2390,14 +2405,7 @@ fn b_infLoop(n: i64) -> i64 {
                 //println!("{}: {:?}", advance, value);
                 let mut engine = Vec::new();
                 //println!("{:?}", value);
-                match value.execute(&mut engine, ExecuteArgs { store: test, ids: HashSet::from([0]), max_loop_iter: 100 }) {
-                    Ok(ok) => {
-                        for res in ok.res.iter() {
-                            println!("{}", res);
-                        }
-                    },
-                    Err(_) => println!("error!"),
-                }
+                print_res(value.execute(&mut engine, ExecuteArgs { store: test, ids: HashSet::from([0]), max_loop_iter: 10 }));
             },
             Error(error) => panic!("Error: {}", error),
             Panic(error) => panic!("Panic: {}", error),
@@ -2421,38 +2429,40 @@ fn s_if(mut x:i32, mut y:i32) -> i32 {
             //symex
         }
         
-    }
-    else {
+    } else {
         y = y + 4;
-        
     }
 
     x = x / 2;
-
 }
 ";
         match parse_file(s) {
             Okay(value, _) => {
                 let mut engine = Vec::new();
-                //println!("{:?}", value);
-                //print!("{:?}", value.execute(s, &mut engine, 0));
-                let result = value.execute(&mut engine, ExecuteArgs { store: s, ids: HashSet::from([0]), max_loop_iter: 100 });
-                match result {
-                    Ok(ok) => {
-                        for res in ok.res.iter() {
-                            println!("{}", res);
-                        }
-                    },
-                    Err(_) => panic!("Error!"),
-                }
-                //let mut i = 0;
-                //while i < engine.len() {
-                    //println!("{}", i);
-                //    if engine[i].pi.satisfiable && engine[i].reached_symex {
-                //      println!("{}", engine[i].to_string());
-                //    }
-                //   // = i + 1;
-                //}
+                print_res(value.execute(&mut engine, ExecuteArgs { store: s, ids: HashSet::from([0]), max_loop_iter: 100 }))
+            },
+            Error(error) => panic!("Error: {}", error),
+            Panic(error) => panic!("Panic: {}", error),
+        }
+    }
+
+
+    #[test]
+    fn test_small_while_loop() {
+        let s = "
+fn s_if(mut x:i32, mut y:i32) -> i32 {
+    x = 0;
+    while x < 2 {
+        x = x + 1;
+        //symex
+    }
+    //symex
+}
+";
+        match parse_file(s) {
+            Okay(value, _) => {
+                let mut engine = Vec::new();
+                print_res(value.execute(&mut engine, ExecuteArgs { store: s, ids: HashSet::from([0]), max_loop_iter: 100 }))
             },
             Error(error) => panic!("Error: {}", error),
             Panic(error) => panic!("Panic: {}", error),
