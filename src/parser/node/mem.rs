@@ -11,12 +11,12 @@ use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult};
 pub struct AnyMemTable<Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> {
     pub store: Store,
     pub table: RefCell<HashMap<(usize, Pos::Key), Box<dyn Any>>>,
-    zst: ZST<V>,
+    _zst: ZST<V>,
 }
 
 impl <Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> AnyMemTable<Store, Pos, V> {
     pub fn new(store: Store) -> Self {
-        Self { store, table: RefCell::new(HashMap::new()), zst: ZST::default() }
+        Self { store, table: RefCell::new(HashMap::new()), _zst: ZST::default() }
     }
 }
 
@@ -147,7 +147,7 @@ impl <Ok: Clone, Err: Clone, Store: ParseStore<Pos, V> + MemTable<Ok, Err, Pos> 
 
         // return the result of parsing at this position
         match cxt.store.mem_set(key, child_res.clone()) {
-            Ok(ok) => child_res,
+            Ok(_) => child_res,
             Err(err) => Panic(err),
         }
     }

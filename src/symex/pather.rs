@@ -1,13 +1,10 @@
-use equation_solver::*;
-use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
-use crate::symex::{SymVar, SymSolver, SymExEngine};
-use std::ops::Deref;
+use crate::symex::{SymSolver, SymExEngine};
 
 pub fn new_engine(engines: &mut Vec<SymExEngine>, fn_name: &String) -> usize {
     let id = engines.len();
 
     let mut init_engine = || -> Result<(), Box<dyn std::error::Error>> {
-        let mut e = SymExEngine {
+        let e = SymExEngine {
             fn_name: fn_name.clone(),
             pi: SymSolver::new(),
             sigma: Vec::new(),
@@ -29,7 +26,7 @@ pub fn clone_engine(engines: &mut Vec<SymExEngine>, path: usize) -> usize {
     let new_id = engines.len();
 
     let mut init_engine = || -> Result<(), Box<dyn std::error::Error>> {
-        let mut e = SymExEngine {
+        let e = SymExEngine {
             fn_name: engines[path].fn_name.clone(),
             pi: SymSolver::copy_solver(&engines[path].pi),
             sigma: (*engines[path].sigma).to_vec(),
@@ -64,7 +61,7 @@ pub fn new_assert(e: &mut Vec<SymExEngine>, path: usize, assert: String, lisp: S
 
 #[cfg(test)]
 mod tests {
-    use crate::symex::*;
+    //use crate::symex::*;
     //#[test]
    // pub fn start() {
         //let mut engines: Vec<SymExEngine> = Vec::new();
@@ -88,5 +85,4 @@ mod tests {
         assert!(is_sat);
         Ok(())
     }*/
-
 }

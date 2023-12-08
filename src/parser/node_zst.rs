@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use zst::ZST;
 
-use super::{ParseValue, ParsePos, ParseStore, ParseNode};
+use super::{ParseValue, ParsePos, ParseStore};
 
 #[allow(unused)]
 pub struct ZSTNode<Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> {

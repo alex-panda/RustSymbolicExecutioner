@@ -8,6 +8,7 @@ use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult};
 /// not. If the child node parses successfully, this node assures that the parse
 /// does not advance.
 /// 
+#[allow(unused)]
 #[allow(non_snake_case)]
 pub fn Is<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(child: Child) -> IsNode<Child, Ok, Err, Store, Pos, V> {
     IsNode { child, _zst: ZSTNode::default() }

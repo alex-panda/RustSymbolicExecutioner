@@ -12,6 +12,7 @@ pub struct TLRecMemTable<Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue
 }
 
 impl <Store: ParseStore<Pos, V>, Pos: ParsePos, V: ParseValue> TLRecMemTable<Store, Pos, V> {
+    #[allow(unused)]
     pub fn new(store: Store) -> Self {
         Self {
             store,
@@ -140,6 +141,7 @@ impl R<Head> {
         self.with(|h|h.nterm)
     }
 
+    #[allow(unused)]
     fn set_rule(&self, rule: usize) {
         self.with_mut(|h|h.nterm = rule)
     }
@@ -152,10 +154,12 @@ impl R<Head> {
         self.with(|s|s.involved_set.contains(&rule))
     }
 
+    #[allow(unused)]
     fn involved_set_remove(&self, rule: usize) {
         self.with_mut(|s|s.involved_set.remove(&rule));
     }
 
+    #[allow(unused)]
     fn evaluation_set_insert(&self, rule: usize) -> bool {
         self.with_mut(|s|s.evaluation_set.insert(rule))
     }
@@ -172,10 +176,12 @@ impl R<Head> {
         self.with_mut(|h|h.evaluation_set = set);
     }
 
+    #[allow(unused)]
     fn set_involved_set(&self, set: HashSet<usize>) {
         self.with_mut(|h|h.involved_set = set);
     }
 
+    #[allow(unused)]
     fn evaluation_set(&self) -> HashSet<usize> {
         self.with(|h|h.evaluation_set.clone())
     }
@@ -239,6 +245,7 @@ impl <Pos: ParsePos> R<Entry<Pos>> {
         }
     }
 
+    #[allow(unused)]
     pub fn lr_nterm(&self) -> Option<usize> {
         self.with_lr(|lr| lr.nterm)
     }
@@ -288,6 +295,7 @@ impl R<LR> {
         self.with_mut(|lr|lr.head = head)
     }
 
+    #[allow(unused)]
     pub fn set_nterm(&self, nterm: usize) {
         self.with_mut(|lr|lr.nterm = nterm)
     }
@@ -338,6 +346,7 @@ pub struct Head {
 ///         allowed if the node is not moved between parses).
 ///  - The node must NOT be moved during the parse (using a RefCell or otherwise).
 /// 
+#[allow(unused)]
 #[allow(non_snake_case)]
 pub fn LRec<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok: Clone, Err: Clone + From<LRecError<Pos>>, Store: ParseStore<Pos, V> + LRecMemTable<Pos> + ?Sized, Pos: ParsePos<Key = K>, V: ParseValue, K: Clone + Hash + Eq + Ord>(child: Child) -> LRecNode<Child, Ok, Err, Store, Pos, V, K> {
     LRecNode { byte: 0, child, _zst: ZSTNode::default() }

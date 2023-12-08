@@ -1,4 +1,5 @@
-use std::{marker::PhantomData, fmt::{Display, Write}};
+#![allow(unused)]
+use std::{marker::PhantomData, fmt::Display};
 
 use super::{ParsePos, ParseStore, ParseValue};
 

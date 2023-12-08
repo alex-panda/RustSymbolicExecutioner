@@ -1,5 +1,4 @@
 use equation_solver::*;
-use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
 use crate::symex::{SymVar, SymSolver};
 
 pub struct SymExEngine {
@@ -15,7 +14,7 @@ pub fn eval(stmt_rs: String) -> String {
     //println!("eval {}", stmt_clean);
     let n = Equation::new(stmt_clean.clone());
 
-    let mut eq = n.unwrap();
+    let eq = n.unwrap();
 
     let wrap_result = eq.evaluate();
     
@@ -60,7 +59,7 @@ impl SymExEngine {
         self.pi.add_int(var_name.clone())
     }
 
-    pub fn display_as_var0(&mut self, mut st: String) -> String {
+    pub fn display_as_var0(&mut self, st: String) -> String {
         let mut stmt = st.replace(";", "");
         let mut i = 0;
         while i < self.sigma.len() {
@@ -143,11 +142,11 @@ impl SymExEngine {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::symex::*;
-    use equation_solver::*;
-    static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
-
-
-}
+//#[cfg(test)]
+//mod tests {
+//    use crate::symex::*;
+//    use equation_solver::*;
+//    static PATH_TO_SOLVER:&str = "z3\\bin\\z3";
+//
+//
+//}

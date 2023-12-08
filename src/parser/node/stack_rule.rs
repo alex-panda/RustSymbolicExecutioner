@@ -50,6 +50,7 @@ pub struct StackRuleNode<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: From
 }
 
 impl <Child: ParseNode<Ok, Err, Store, Pos, V>, Ok, Err: From<EmptyRuleError>, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue> StackRuleNode<Child, Ok, Err, Store, Pos, V> {
+    #[allow(unused)]
     #[inline]
     pub fn with(child: Child) -> Self {
         StackRuleNode {

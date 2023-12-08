@@ -1,5 +1,4 @@
 use thiserror::Error;
-use super::super::ParsePos;
 
 #[derive(Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[error("`Never` node error")]

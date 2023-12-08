@@ -1,8 +1,9 @@
+#![allow(unused)]
 use std::{fmt::Display, collections::HashSet};
 
-use crate::{parser::{ParseContext, Not, AnyV, Funnel4, AnyMemTable, Funnel6, Join, Funnel2, OneOf8, MapPValue, Funnel9, LRJoin, Funnel3, Funnel8, OneOf11, RLJoin, Funnel12, Funnel, AnyOf4, AnyOf11, AnyOf8, OJoin}, srule, symex::{SymExEngine, self, new_assert, clone_engine}};
+use crate::{parser::{ParseContext, Not, AnyV, Funnel4, AnyMemTable, Funnel6, Join, Funnel2, OneOf8, MapPValue, Funnel9, LRJoin, Funnel3, Funnel8, OneOf11, RLJoin, Funnel12, Funnel, AnyOf4, AnyOf11, AnyOf8, OJoin}, srule, symex::{SymExEngine, self, new_assert}};
 
-use super::{ParseResult, Span, ZeroOrMore, ParseNode, SpanOf, Map, OneOf3, Spanned, OneOrMore, AnyOf3, Maybe, AnyOf2, MapV, OneOf6, Leader, Surround, End, Req, OneOf5, OneOf4, OneOf2, ParsePos, ParseStore};
+use super::{ParseResult, Span, ZeroOrMore, SpanOf, Map, OneOf3, Spanned, OneOrMore, AnyOf3, Maybe, AnyOf2, MapV, OneOf6, Leader, Surround, End, Req, OneOf5, OneOf4, OneOf2, ParsePos, ParseStore};
 
 use ParseResult::*;
 use unicode_xid::UnicodeXID;
@@ -30,6 +31,7 @@ impl PPos {
         }
     }
 
+    #[allow(unused)]
     /// Creates a new `PPos` with the given index.
     pub fn with_index(index: usize) -> Self {
         Self { index, column: 1, line: 1 }
@@ -126,8 +128,6 @@ impl Display for SymexRes {
         Ok(())
     }
 }
-
-type ReturnResult = Result<ExOk, ExErr>;
 
 pub struct ExecuteArgs<'a, Store: ParseStore<PPos, char> + ?Sized> {
     pub store: &'a Store,
@@ -2401,7 +2401,7 @@ fn b_infLoop(n: i64) -> i64 {
         ";
 
         match parse_file(test) {
-            Okay(value, advance) => {
+            Okay(value, _) => {
                 //println!("{}: {:?}", advance, value);
                 let mut engine = Vec::new();
                 //println!("{:?}", value);

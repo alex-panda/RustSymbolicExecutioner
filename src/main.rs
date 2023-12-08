@@ -5,13 +5,9 @@ mod symex;
 use std::collections::HashSet;
 use std::env;
 use std::fs;
-//use equation_solver::*;
-use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
-use crate::symex::{SymVar, SymExEngine};
 use crate::parser::*;
 use crate::parser::parser::parse_file;
 use crate::parser::parser::Execute;
-//use parse_file;
 use ParseResult::*;
 
 //static PATH_TO_SOLVER:&str = "z3\\bin\\z3";

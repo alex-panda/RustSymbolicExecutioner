@@ -5,6 +5,7 @@ use crate::parser::{ZSTNode, ParseNode, ParseResult, ParseValue, ParsePos, Parse
 /// Returns a node that will map the current position of the parse to a
 /// `ParseResult` using the given function.
 /// 
+#[allow(unused)]
 #[allow(non_snake_case)]
 pub fn MapP<F: Fn(&Store, Pos) -> ParseResult<Ok, Err, Pos>, Ok, Err, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(f: F) -> MapPNode<F, Ok, Err, Store, Pos, V> {
     MapPNode {

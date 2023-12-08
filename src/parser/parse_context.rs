@@ -1,3 +1,4 @@
+#![allow(unused)]
 use zst::ZST;
 
 use super::{ParseStore, ParsePos, ParseValue, ParseResult, UnexpectedEndError, Span};

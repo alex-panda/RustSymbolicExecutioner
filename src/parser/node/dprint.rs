@@ -7,6 +7,7 @@ use super::super::{ParseNode, ParsePos, ParseStore, ParseValue, ParseResult};
 /// Returns a node that prints (in debug mode) every result that the given child
 /// parses. This node mainly exists for debugging purposes.
 /// 
+#[allow(unused)]
 #[allow(non_snake_case)]
 pub fn DPrint<Child: ParseNode<Ok, Err, Store, Pos, V>, Ok: Debug, Err: Debug, Store: ParseStore<Pos, V> + ?Sized, Pos: ParsePos, V: ParseValue>(child: Child) -> DPrintNode<Child, Ok, Err, Store, Pos, V> {
     DPrintNode { child, _zst: ZSTNode::default() }

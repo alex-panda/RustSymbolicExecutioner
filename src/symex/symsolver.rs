@@ -1,8 +1,6 @@
+#![allow(unused)]
 static PATH_TO_SOLVER:&str = "z3\\bin\\z3.exe";
 use rsmt2::*;
-use std::rc::Rc;
-
-use crate::symex::engine;
 
 pub struct SymSolver {
     pub s: Solver<()>,
@@ -65,16 +63,17 @@ impl SymSolver {
                     self.satisfiable = false;
                 }
             }, 
-            Err(E) => {
+            Err(_) => {
                 println!("Error when attempting to assert {} with Z3", assert);
                 self.satisfiable = false;
             },
         }   
     }
+
     pub fn load_solver(&self) -> Solver<()> {
         let mut s = SmtConf::z3(PATH_TO_SOLVER).spawn(()).unwrap();
         let ints = self.int_str.split("#");
-        for i in ints {
+        for _ in ints {
             //println!("{}", i);
             //s.declare_const(i.clone(), "Int");
         }
@@ -82,7 +81,7 @@ impl SymSolver {
         let asserts = self.assert_str.split("#");
         for a in asserts {
            // println!("{}", a);
-            s.assert(a.clone().to_string());
+            let _ = s.assert(a.clone().to_string());
         }
         return s;
     }
@@ -92,7 +91,7 @@ impl SymSolver {
     }
 
     pub fn add_int(&mut self, v: String) {
-        self.s.declare_const(v.clone(), "Int");
+        let _ = self.s.declare_const(v.clone(), "Int");
         self.int_str = format!("{}#{}", self.int_str, v.clone());
     }
 
@@ -105,8 +104,7 @@ impl SymSolver {
 
 #[cfg(test)]
 mod tests {
-    use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort};
-    use crate::symex::{SymVar, SymSolver, SymExEngine};
+    use crate::symex::SymSolver;
 
     #[test]
     pub fn test_lisp() -> Result<(), Box<dyn std::error::Error>> {
