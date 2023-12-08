@@ -184,7 +184,8 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RItem {
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RFn {
     fn execute<'a>(&self, engine: &mut Vec<SymExEngine>,  args: ExecuteArgs<'a, Store>) -> Result<ExOk, ExErr> {
-        let ids = HashSet::from([symex::new_engine(engine)]);
+        let fn_name = &self.id.into_string(args.store);
+        let ids = HashSet::from([symex::new_engine(engine, fn_name)]);
 
         // add the params
         for arg in &self.args {
@@ -2406,12 +2407,17 @@ fn b_infLoop(n: i64) -> i64 {
     #[test]
     fn test_symex() {
         let s = "
+fn test(mut y: i32) {
+    y = 8;
+    let w = 9;
+    //symex
+}
 fn s_if(mut x:i32, mut y:i32) -> i32 {
     x = y * 2;
     if x == 6 {
         y = y + 3;
         if y > 2 {
-            y = 3;
+            y = y + 2;
             //symex
         }
         
@@ -2422,7 +2428,6 @@ fn s_if(mut x:i32, mut y:i32) -> i32 {
     }
 
     x = x / 2;
-    //symex
 
 }
 ";

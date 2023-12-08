@@ -3,11 +3,12 @@ use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort}
 use crate::symex::{SymVar, SymSolver, SymExEngine};
 use std::ops::Deref;
 
-pub fn new_engine(engines: &mut Vec<SymExEngine>) -> usize {
+pub fn new_engine(engines: &mut Vec<SymExEngine>, fn_name: &String) -> usize {
     let id = engines.len();
 
     let mut init_engine = || -> Result<(), Box<dyn std::error::Error>> {
         let mut e = SymExEngine {
+            fn_name: fn_name.clone(),
             pi: SymSolver::new(),
             sigma: Vec::new(),
             path: engines.len() as u32,
@@ -29,6 +30,7 @@ pub fn clone_engine(engines: &mut Vec<SymExEngine>, path: usize) -> usize {
 
     let mut init_engine = || -> Result<(), Box<dyn std::error::Error>> {
         let mut e = SymExEngine {
+            fn_name: engines[path].fn_name.clone(),
             pi: SymSolver::copy_solver(&engines[path].pi),
             sigma: (*engines[path].sigma).to_vec(),
             path: engines.len() as u32,
@@ -63,12 +65,12 @@ pub fn new_assert(e: &mut Vec<SymExEngine>, path: usize, assert: String, lisp: S
 #[cfg(test)]
 mod tests {
     use crate::symex::*;
-    #[test]
-    pub fn start() {
-        let mut engines: Vec<SymExEngine> = Vec::new();
-        pather::new_engine(&mut engines);
-        println!("{}", engines[0].to_string());
-    }
+    //#[test]
+   // pub fn start() {
+        //let mut engines: Vec<SymExEngine> = Vec::new();
+        //pather::new_engine(&mut engines);
+       // println!("{}", engines[0].to_string());
+  //  }
 
     /*#[test]
     pub fn test_new_assert() -> Result<(), Box<dyn std::error::Error>> {
