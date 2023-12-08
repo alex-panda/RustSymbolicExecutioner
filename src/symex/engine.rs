@@ -3,6 +3,7 @@ use smtlib::{backend::Z3Binary, Int, terms::*, SatResultWithModel, Solver, Sort}
 use crate::symex::{SymVar, SymSolver};
 
 pub struct SymExEngine {
+    pub fn_name: String,
     pub pi: SymSolver,
     pub sigma: Vec<SymVar>,
     pub path: u32,
@@ -36,7 +37,7 @@ impl SymExEngine {
             s = s + "\t" + &self.sigma[i].to_string() + "\n";
             i = i + 1;
         }
-        format!("path id: {}\npi: {} && {}\nsigma: {}", &self.path, &self.pi.satisfiable.to_string(), &self.pi.to_string(), s)
+        format!("function: {}\npath id: {}\npi: {} && {}\nsigma: {}", &self.fn_name, &self.path, &self.pi.satisfiable.to_string(), &self.pi.to_string(), s)
     }
 
     //creates symvar from function header
