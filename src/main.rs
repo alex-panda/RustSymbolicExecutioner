@@ -46,7 +46,7 @@ fn run_parser(filename: String) {
             let mut engine = Vec::new();
             //println!("{:?}", value);
             //println!("{:?}", );
-            let _result = value.execute(text, &mut engine, HashSet::from([0]));
+            let _result = value.execute(&mut engine, parser::parser::ExecuteArgs { store: text, ids: HashSet::from([0]), max_loop_iter: 100 });
             let mut i = 0;
             while i < engine.len() {
                 //println!("{}", i);

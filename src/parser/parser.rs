@@ -1,6 +1,6 @@
 use std::{fmt::Display, collections::HashSet};
 
-use crate::{parser::{ParseContext, Not, AnyV, Funnel4, AnyMemTable, Funnel6, Join, Funnel2, OneOf8, MapPValue, Funnel9, LRJoin, Funnel3, Funnel8, OneOf11, RLJoin, Funnel12, Funnel, AnyOf4, AnyOf11, AnyOf8, OJoin}, srule, symex::{SymExEngine, self, new_assert}};
+use crate::{parser::{ParseContext, Not, AnyV, Funnel4, AnyMemTable, Funnel6, Join, Funnel2, OneOf8, MapPValue, Funnel9, LRJoin, Funnel3, Funnel8, OneOf11, RLJoin, Funnel12, Funnel, AnyOf4, AnyOf11, AnyOf8, OJoin}, srule, symex::{SymExEngine, self, new_assert, clone_engine}};
 
 use super::{ParseResult, Span, ZeroOrMore, ParseNode, SpanOf, Map, OneOf3, Spanned, OneOrMore, AnyOf3, Maybe, AnyOf2, MapV, OneOf6, Leader, Surround, End, Req, OneOf5, OneOf4, OneOf2, ParsePos, ParseStore};
 
@@ -99,23 +99,74 @@ pub struct ExOk {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct SymexRes {
-    symex_pos: Span<PPos>,
-    res: String,
+pub enum SymexRes {
+    Symex {
+        symex_pos: Span<PPos>,
+        res: String,
+    },
+    InfiniteLoopMaxIterHit,
+    WhileLoopMaxIterHit,
+    ForLoopMaxIterHit,
+}
+
+impl Display for SymexRes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use SymexRes::*;
+        match self {
+            Symex { symex_pos, res } => {
+                Display::fmt(symex_pos, f)?;
+                f.write_str("\n")?;
+                f.write_str(res)?;
+            },
+            InfiniteLoopMaxIterHit => f.write_str("Infinite loop hit iteration limit")?,
+            WhileLoopMaxIterHit    => f.write_str("While loop hit iteration limit")?,
+            ForLoopMaxIterHit      => f.write_str("For loop hit iteration limit")?,
+        }
+
+        Ok(())
+    }
 }
 
 type ReturnResult = Result<ExOk, ExErr>;
 
+pub struct ExecuteArgs<'a, Store: ParseStore<PPos, char> + ?Sized> {
+    pub store: &'a Store,
+    pub ids: HashSet<usize>,
+    pub max_loop_iter: usize,
+}
+
+impl <'a, Store: ParseStore<PPos, char> + ?Sized> ExecuteArgs<'a, Store> {
+    pub fn with_ids(mut self, ids: HashSet<usize>) -> Self {
+        self.ids = ids;
+        self
+    }
+
+    pub fn with_max_loop_iter(mut self, max_loop_iter: usize) -> Self {
+        self.max_loop_iter = max_loop_iter;
+        self
+    }
+}
+
+impl <'a, Store: ParseStore<PPos, char> + ?Sized> Clone for ExecuteArgs<'a, Store> {
+    fn clone(&self) -> ExecuteArgs<'a, Store> {
+        ExecuteArgs {
+            store: self.store,
+            ids: self.ids.clone(),
+            max_loop_iter: self.max_loop_iter,
+        }
+    }
+}
+
 pub trait Execute<Store: ParseStore<PPos, char> + ?Sized> {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr>;
+    fn execute<'a>(&self, engine: &mut Vec<SymExEngine>, args: ExecuteArgs<'a, Store>) -> Result<ExOk, ExErr>;
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RCrate {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
+    fn execute<'a>(&self, engine: &mut Vec<SymExEngine>, args: ExecuteArgs<'a, Store>) -> Result<ExOk, ExErr> {
         let mut results = Vec::new();
 
         for item in self.items.iter() {
-            let res = item.execute(store, engine, HashSet::new())?;
+            let res = item.execute(engine, args.clone().with_ids(HashSet::new()))?;
             results.extend(res.res);
         }
 
@@ -124,39 +175,39 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RCrate {
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RItem {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
+    fn execute<'a>(&self, engine: &mut Vec<SymExEngine>,  args: ExecuteArgs<'a, Store>) -> Result<ExOk, ExErr> {
         match self {
-            RItem::Fn {span, vis, val}
-                => val.execute(store, engine, ids),
+            RItem::Fn {span, vis, val} => val.execute(engine, args),
         }
     }
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RFn {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
-        let mut ids = HashSet::from([symex::new_engine(engine)]);
+    fn execute<'a>(&self, engine: &mut Vec<SymExEngine>,  args: ExecuteArgs<'a, Store>) -> Result<ExOk, ExErr> {
+        let ids = HashSet::from([symex::new_engine(engine)]);
 
         // add the params
         for arg in &self.args {
-            arg.execute(store, engine, ids.clone())?;
+            arg.execute(engine, args.clone().with_ids(ids.clone()))?;
         }
 
         // execute the body now that we have the params
-        let mut res = self.body.execute(store, engine, ids)?;
+        let mut res = self.body.execute(engine, args.clone().with_ids(ids))?;
         res.continues.clear();
         Ok(res)
     }
 }
-impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RBlock {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
-        let mut results = Vec::new();
-        let mut continues = ids.clone();
 
-        for id in ids {
+impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RBlock {
+    fn execute<'a>(&self, engine: &mut Vec<SymExEngine>,  args: ExecuteArgs<'a, Store>) -> Result<ExOk, ExErr> {
+        let mut results = Vec::new();
+        let mut continues = args.ids.clone();
+
+        for id in args.ids.clone() {
             let mut internal_continues = HashSet::from([id]);
 
             for stmt in &self.statements {
-                let res = stmt.execute(store, engine, internal_continues.clone())?;
+                let res = stmt.execute(engine, args.clone().with_ids(internal_continues.clone()))?;
                 results.extend(res.res);
                 internal_continues.extend(res.continues.clone());
                 continues.extend(res.continues);
@@ -171,7 +222,7 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RBlock {
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RStatement {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
+    fn execute<'a>(&self, engine: &mut Vec<SymExEngine>,  mut args: ExecuteArgs<'a, Store>) -> Result<ExOk, ExErr> {
         use RStatement::*; 
         match self {
             Comment{comment} => {
@@ -179,10 +230,10 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RStatement {
                     RComment::Symex { symex, .. } => {
                         let mut res = Vec::new();
 
-                        for id in ids {
+                        for id in args.ids.clone() {
                             engine[id].reached_symex = true;
 
-                            res.push(SymexRes {
+                            res.push(SymexRes::Symex {
                                 symex_pos: symex.clone(),
                                 res: engine[id].to_string()
                             });
@@ -193,22 +244,22 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RStatement {
                     _ => Ok(ExOk { cont: true, res: Vec::new(), continues: HashSet::new() }),
                 }
             },
-            Expr {expr, semi} => expr.execute(store, engine, ids),
+            Expr {expr, semi} => expr.execute(engine, args),
             Return { expr, .. } => {
-                let mut res = expr.execute(store, engine, ids)?;
+                let mut res = expr.execute(engine, args)?;
                 res.cont = false;
                 Ok(res)
             },
             SColon { .. } => Ok(ExOk { cont: true, res: Vec::new(), continues: HashSet::new() }),
-            If {stmt} => stmt.execute(store, engine, ids),
-            Loop {stmt} => stmt.execute(store, engine, ids),
+            If {stmt} => stmt.execute(engine, args),
+            Loop {stmt} => stmt.execute(engine, args),
             Assign {ident, ty, equal_value,..} => {
-                for id in ids {
+                for id in args.ids.clone() {
                     engine[id].new_variable_assign(
-                        ident.into_string(store),
-                        ty.clone().map(|v|v.into_string(store)).unwrap_or_else(||"i32".to_string()),
-                        equal_value.span().into_string(store),
-                        equal_value.into_lisp(store)
+                        ident.into_string(args.store),
+                        ty.clone().map(|v|v.into_string(args.store)).unwrap_or_else(||"i32".to_string()),
+                        equal_value.span().into_string(args.store),
+                        equal_value.into_lisp(args.store)
                     );
                 }
 
@@ -220,25 +271,25 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RStatement {
 
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RParam {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
-        for id in ids {
-            engine[id].new_variable(self.id.into_string(store), self.ty.into_string(store));
+    fn execute<'a>(&self, engine: &mut Vec<SymExEngine>,  args: ExecuteArgs<'a, Store>) -> Result<ExOk, ExErr> {
+        for id in args.ids.clone() {
+            engine[id].new_variable(self.id.into_string(args.store), self.ty.into_string(args.store));
         }
         return Ok(ExOk { cont: true, res: Vec::new(), continues: HashSet::new() });
     }
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RExpr {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
+    fn execute<'a>(&self, engine: &mut Vec<SymExEngine>,  args: ExecuteArgs<'a, Store>) -> Result<ExOk, ExErr> {
         use RExpr::*;
         match self {
             Lit(_) => {},
             Var(_) => {},
             Path(_, _) => {},
-            Group { expr, .. } => return expr.execute(store, engine, ids),
-            Block(b) => return b.execute(store, engine, ids),
-            If(i) => return i.execute(store, engine, ids),
-            Loop(l) => return l.execute(store, engine, ids),
+            Group { expr, .. } => return expr.execute(engine, args),
+            Block(b) => return b.execute(engine, args),
+            If(i) => return i.execute(engine, args),
+            Loop(l) => return l.execute(engine, args),
             Call { span, ident, args } => {},
             Deref { span, star, expr } => {},
             Borrow { span, and, expr } => {},
@@ -246,11 +297,11 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RExpr {
             Negate { span, neg, expr } => {},
             Not { span, not, expr } => {},
             AssignOp { span, left, op, op_span, right } => {
-                for id in ids {
+                for id in args.ids {
                     engine[id].assign_symvar_value(
-                        right.span().into_string(store),
-                        left.span().into_string(store),
-                        right.into_lisp(store)
+                        right.span().into_string(args.store),
+                        left.span().into_string(args.store),
+                        right.into_lisp(args.store)
                     );
                 }
             },
@@ -261,19 +312,20 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RExpr {
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RIf {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, ids: HashSet<usize>) -> Result<ExOk, ExErr> {
+    fn execute<'a>(&self, engine: &mut Vec<SymExEngine>, args: ExecuteArgs<'a, Store>) -> Result<ExOk, ExErr> {
         let mut res = ExOk { cont: true, res: Vec::new(), continues: HashSet::new() };
 
-        for bad_path in ids {
+        for bad_path in args.ids.iter().map(|v|*v) {
             for (expr, block) in self.ifs.iter() {
-                let good_path = new_assert(engine, bad_path, expr.span().into_string(store), expr.into_lisp(store));
-                let result = block.execute(store, engine, HashSet::from([good_path]))?;
+                let good_path = new_assert(engine, bad_path, expr.span().into_string(args.clone().store), expr.into_lisp(args.clone().store));
+                let result = block.execute(engine, args.clone().with_ids(HashSet::from([good_path])))?;
                 res.res.extend(result.res);
+                res.continues.insert(good_path);
                 res.continues.extend(result.continues);
             }
 
             if let Some(block) = &self.else_stmt {
-                let result = block.execute(store, engine, HashSet::from([bad_path]))?;
+                let result = block.execute(engine, args.clone().with_ids(HashSet::from([bad_path])))?;
                 res.res.extend(result.res);
                 res.continues.extend(result.continues);
             }
@@ -284,8 +336,49 @@ impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RIf {
 }
 
 impl <Store: ParseStore<PPos, char> + ?Sized> Execute<Store> for RLoop {
-    fn execute(&self, store: &Store, engine: &mut Vec<SymExEngine>, id: HashSet<usize>) -> Result<ExOk, ExErr> {
-        Ok(ExOk { cont: true, res: Vec::new(), continues: HashSet::new() })
+    fn execute<'a>(&self, engine: &mut Vec<SymExEngine>,  args: ExecuteArgs<'a, Store>) -> Result<ExOk, ExErr> {
+        let mut res = ExOk { cont: true, res: Vec::new(), continues: HashSet::new() };
+
+        match self {
+            RLoop::Infinite { span, block } => {
+                for good_path in args.ids.iter().map(|v|*v) {
+                    for i in 0..args.max_loop_iter {
+                        let result = block.execute(
+                            engine, 
+                            args.clone().with_ids(HashSet::from([good_path]))
+                        )?;
+                        res.res.extend(result.res);
+                        res.continues.extend(result.continues);
+
+                        if i == args.max_loop_iter - 1 {
+                            res.res.push(SymexRes::InfiniteLoopMaxIterHit);
+                        }
+                    }
+                }
+            },
+            RLoop::While { span, expr, block } => {
+                for bad_path in args.ids.iter().map(|v|*v) {
+                    for i in 0..args.max_loop_iter {
+                        let good_path = new_assert(engine, bad_path, expr.span().into_string(args.store), expr.into_lisp(args.store));
+                        res.continues.insert(good_path);
+                        if engine[good_path].pi.satisfiable {
+                            let result = block.execute(engine, args.clone().with_ids(HashSet::from([good_path])))?;
+                            res.res.extend(result.res);
+                            res.continues.extend(result.continues);
+                        } else {
+                            break
+                        }
+
+                        if i == args.max_loop_iter - 1 {
+                            res.res.push(SymexRes::InfiniteLoopMaxIterHit);
+                        }
+                    }
+                }
+            },
+            RLoop::For { span, var, expr, block } => { panic!("no for loop support yet!") },
+        }
+
+        Ok(res)
     }
 }
 
@@ -2084,7 +2177,7 @@ mod tests {
 
     use crate::parser::parser::{RCrate, RFn, Execute};
 
-    use super::parse_file;
+    use super::{parse_file, ExecuteArgs};
     use super::super::ParseResult;
     use ParseResult::*;
     use super::PPos;
@@ -2259,44 +2352,51 @@ fn s2_ifStmt(mut x:i32, mut y:i32) -> i32 {
     return x;
 }
 
-//fn s_loop(n: i64) -> i64 {
-//    let mut i: i64 = 0;
-//    let mut j: i64 = 1;
-//    while i < n {
-//        j = j * 2;
-//        i = i + 1;
-//    }
-//    //symex - what is the value of i
-//	return i;
-//}
-//
-//fn b_loop(n: i64) -> i64 {
-//    let mut i: i64 = 0;
-//    let mut j: i64 = 1;
-//    while i <= n {
-//        j = j * 2;
-//        i = i + 1;
-//    }
-//    //symex - what is the value of i
-//	return i;
-//}
-//
-//fn b_infLoop(n: i64) -> i64 {
-//    let mut i = 0;
-//    let mut j = 1;
-//    while i < n {
-//        j = j * 2;
-//    }
-//	return i;
-//}
+fn s_loop(n: i64) -> i64 {
+    let mut i: i64 = 0;
+    let mut j: i64 = 1;
+    while i < n {
+        j = j * 2;
+        i = i + 1;
+    }
+    //symex - what is the value of i
+	return i;
+}
+
+fn b_loop(n: i64) -> i64 {
+    let mut i: i64 = 0;
+    let mut j: i64 = 1;
+    while i <= n {
+        j = j * 2;
+        i = i + 1;
+    }
+    //symex - what is the value of i
+	return i;
+}
+
+fn b_infLoop(n: i64) -> i64 {
+    let mut i = 0;
+    let mut j = 1;
+    while i < n {
+        j = j * 2;
+    }
+	return i;
+}
         ";
 
         match parse_file(test) {
             Okay(value, advance) => {
                 //println!("{}: {:?}", advance, value);
                 let mut engine = Vec::new();
-                println!("{:?}", value);
-                println!("{:?}", value.execute(test, &mut engine, HashSet::from([0])));
+                //println!("{:?}", value);
+                match value.execute(&mut engine, ExecuteArgs { store: test, ids: HashSet::from([0]), max_loop_iter: 100 }) {
+                    Ok(ok) => {
+                        for res in ok.res.iter() {
+                            println!("{}", res);
+                        }
+                    },
+                    Err(_) => println!("error!"),
+                }
             },
             Error(error) => panic!("Error: {}", error),
             Panic(error) => panic!("Panic: {}", error),
@@ -2331,11 +2431,11 @@ fn s_if(mut x:i32, mut y:i32) -> i32 {
                 let mut engine = Vec::new();
                 //println!("{:?}", value);
                 //print!("{:?}", value.execute(s, &mut engine, 0));
-                let result = value.execute(s, &mut engine, HashSet::from([0]));
+                let result = value.execute(&mut engine, ExecuteArgs { store: s, ids: HashSet::from([0]), max_loop_iter: 100 });
                 match result {
                     Ok(ok) => {
                         for res in ok.res.iter() {
-                            println!("{}: {}", res.symex_pos, res.res);
+                            println!("{}", res);
                         }
                     },
                     Err(_) => panic!("Error!"),

@@ -24,7 +24,9 @@ pub fn new_engine(engines: &mut Vec<SymExEngine>) -> usize {
     id
 }
 
-pub fn clone_engine(engines: &mut Vec<SymExEngine>, path: usize) {
+pub fn clone_engine(engines: &mut Vec<SymExEngine>, path: usize) -> usize {
+    let new_id = engines.len();
+
     let mut init_engine = || -> Result<(), Box<dyn std::error::Error>> {
         let mut e = SymExEngine {
             pi: SymSolver::copy_solver(&engines[path].pi),
@@ -35,9 +37,12 @@ pub fn clone_engine(engines: &mut Vec<SymExEngine>, path: usize) {
         engines.push(e);
         Ok(())
     };
+
     if let Err(_err) = init_engine() {
         println!("Failed to initialize symbolic execution engine.");
     }
+
+    new_id
 }
 
 
