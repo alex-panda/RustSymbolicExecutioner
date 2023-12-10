@@ -1,4 +1,5 @@
 fn main() {
+    s_algebra(0, 0);
     b_algebra(0, 0);
     b_if_stmt(0, 0);
     b2_if_stmt(0, 0);
@@ -7,11 +8,21 @@ fn main() {
     b_loop(0);
     b_inf_loop(0);
     s_loop(0);
+    s_nested_if_loop(0);
+    b_nested_if_loop(0);
+}
+
+fn s_algebra(mut x:i32, mut y:i32) -> i32 {
+    x = y + 4;
+    y = 2*x; 
+    let mut w = (x*4) + y;
+    //symex - how does argument x affect this 
+    return w;
 }
 
 fn b_algebra(mut x:i32, mut y:i32) -> i32 {
-    x = y + 4;
-    y = 2 * x; 
+    x = x + 4;
+    y = 2 * y; 
     let w = x / y;
     //symex - division by zero?
     return w;
@@ -20,29 +31,25 @@ fn b_algebra(mut x:i32, mut y:i32) -> i32 {
 fn b_if_stmt(mut x:i32, mut y:i32) -> u8 {
     x = y + 4;
     y = 2*x; 
-
     if x <= 4 {
-        x = 4;
+        y = 4;
     } else if x > 4 {
-        x = 2;
+        y = 2;
     } else {
         y = 0;
         //symex - is this reachable?
     }
-    //symex - what can the value of y be
     return 0;
 }
 fn s_if_stmt(mut x:i32, mut y:i32) -> u8 {
     x = y + 4;
     y = 2*x; 
     if x < 4 {
-        x = 4;
+        y = 4;
     }
-
     else if x > 4 {
-        x = 2;
+        y = 2;
     }
-
     else {
         y = 0;
         //symex - is this reachable?
@@ -50,16 +57,17 @@ fn s_if_stmt(mut x:i32, mut y:i32) -> u8 {
     return 0;
 }
 
-fn b2_if_stmt(mut x:i32, mut y:i32) -> u8 {
-    if x < 5 {
+fn b(mut x:i32, mut y:i32) {
+    if x <= 5 {
         if x >= 5 {
             y = x;
+	//symex
         }
         y = y + 1;
-        //symex - what values can y have?
-    }
-    return 0;
+     }
+    //symex
 }
+
 
 fn s2_if_stmt(mut x:i32, mut y:i32) -> u8 {
     if x < 5 {
@@ -92,6 +100,30 @@ fn b_loop(n: i64) {
     //symex - what is the value of i
 }
 
+fn b_nested_if_loop(mut a: i32) -> i32 {
+    let mut i = 0;
+    while i < 3 {
+        i = i + 1;
+        if i == 3 {
+            a = 0;
+            //symex
+        }
+    }
+    i
+}
+
+fn s_nested_if_loop(mut a: i32) -> i32 {
+    let mut i = 0;
+    while i < 3 {
+        if i == 3 {
+            a = 0;
+            //symex
+        }
+        i = i + 1;
+    }
+    i
+}
+
 fn b_inf_loop(n: i64) {
     let i = 0;
     let mut j = 1;
@@ -99,3 +131,4 @@ fn b_inf_loop(n: i64) {
         j = j * 2;
     }
 }
+

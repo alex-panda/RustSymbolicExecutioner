@@ -2415,24 +2415,17 @@ fn b_infLoop(n: i64) -> i64 {
     #[test]
     fn test_symex() {
         let s = "
-fn test(mut y: i32) {
-    y = 8;
-    let w = 9;
-    //symex
-}
-fn s_if(mut x:i32, mut y:i32) -> i32 {
+fn b(mut x:i32, mut y:i32) -> i32 {
     x = y * 2;
     if x == 6 {
         y = y + 3;
         if y > 2 {
             y = y + 2;
-            //symex
         }
-        
     } else {
         y = y + 4;
     }
-
+    //symex
     x = x / 2;
 }
 ";
