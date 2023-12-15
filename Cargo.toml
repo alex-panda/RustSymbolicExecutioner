@@ -12,3 +12,4 @@ smtlib = { version = "0.1.6", features = ["z3"] }
 equation-solver = "0.1.1"
 unicode-xid = "0.2.4"
 rsmt2 = "0.16.2"
+paste = "1.0.14"

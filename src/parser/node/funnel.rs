@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::parser::ParseContext;
 
 use super::super::{ParseStore, ParsePos, ParseValue, ParseNode, ParseResult, AllChildrenFailedError, ZSTNode, Span};
