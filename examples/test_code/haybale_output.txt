@@ -1,0 +1,11 @@
+Inputs for which s_algebra returns 0: [I32(0), I32(2147483644)]
+Inputs for which b_algebra returns 0: [I32(0), I32(-1073741828)]
+b_ifStmt can never return 0
+Inputs for which b returns 0: [I32(0), I32(3)]
+Inputs for which s_ifStmt returns 0: [I32(4), I32(0)]
+Inputs for which s2_ifStmt returns 0: [I32(2), I32(2147483136)]
+Inputs for which s_loop returns 0: [I32(9)]
+b_loop can never return 0
+Inputs for which b_nestedIfLoop returns 0: [I32(0)]
+s_nestedIfLoop can never return 0
+Inputs for which b_infLoop returns 0: [I32(-1073741824)]

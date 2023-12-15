@@ -14,6 +14,8 @@ pub fn eval(stmt_rs: String) -> String {
     //println!("eval {}", stmt_clean);
     let n = Equation::new(stmt_clean.clone());
 
+    let e = match n {
+            Ok(_) => {
     let eq = n.unwrap();
 
     let wrap_result = eq.evaluate();
@@ -22,8 +24,12 @@ pub fn eval(stmt_rs: String) -> String {
         Ok(_) => wrap_result.unwrap().to_string(), // f64
         Err(_) => stmt_clean.clone(), // EquationError
     };
+        return eval;
+    }
+    Err(_) => {return stmt_clean.clone();}
+    };
 
-    return eval;
+
 }
 
 

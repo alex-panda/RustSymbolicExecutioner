@@ -1,0 +1,182 @@
+Failing input:
+
+        fuzz/artifacts/b_algebra/crash-d67282f0e9533909e48d16aa0ccb3e408c15f3f2
+
+Output of `std::fmt::Debug`:
+
+        (
+            0,
+            0,
+        )
+
+Reproduce with:
+
+        cargo fuzz run b_algebra fuzz/artifacts/b_algebra/crash-d67282f0e9533909e48d16aa0ccb3e408c15f3f2
+
+Minimize test case with:
+
+        cargo fuzz tmin b_algebra fuzz/artifacts/b_algebra/crash-d67282f0e9533909e48d16aa0ccb3e408c15f3f2
+
+────────────────────────────────────────────────────────────────────────────────
+
+Failing input:
+
+        fuzz/artifacts/b_infLoop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+
+Output of `std::fmt::Debug`:
+
+        10
+
+Reproduce with:
+
+        cargo fuzz run b_infLoop fuzz/artifacts/b_infLoop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+
+Minimize test case with:
+
+        cargo fuzz tmin b_infLoop fuzz/artifacts/b_infLoop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+
+────────────────────────────────────────────────────────────────────────────────
+
+
+Failing input:
+
+        fuzz/artifacts/b_loop/crash-215bb47da8fac3342b858ac3db09b033c6c46e0b
+
+Output of `std::fmt::Debug`:
+
+        57
+
+Reproduce with:
+
+        cargo fuzz run b_loop fuzz/artifacts/b_loop/crash-215bb47da8fac3342b858ac3db09b033c6c46e0b
+
+Minimize test case with:
+
+        cargo fuzz tmin b_loop fuzz/artifacts/b_loop/crash-215bb47da8fac3342b858ac3db09b033c6c46e0b
+
+────────────────────────────────────────────────────────────────────────────────
+
+
+Failing input:
+
+        fuzz/artifacts/b_nestedIfLoop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+
+Output of `std::fmt::Debug`:
+
+        10
+
+Reproduce with:
+
+        cargo fuzz run b_nestedIfLoop fuzz/artifacts/b_nestedIfLoop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+
+Minimize test case with:
+
+        cargo fuzz tmin b_nestedIfLoop fuzz/artifacts/b_nestedIfLoop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+
+────────────────────────────────────────────────────────────────────────────────
+
+
+Failing input:
+
+        fuzz/artifacts/b/crash-ad2ae74d026c16542218605507197c84d3040645
+
+Output of `std::fmt::Debug`:
+
+        (
+            10,
+            3,
+        )
+
+Reproduce with:
+
+        cargo fuzz run b fuzz/artifacts/b/crash-ad2ae74d026c16542218605507197c84d3040645
+
+Minimize test case with:
+
+        cargo fuzz tmin b fuzz/artifacts/b/crash-ad2ae74d026c16542218605507197c84d3040645
+
+────────────────────────────────────────────────────────────────────────────────
+
+
+Failing input:
+
+        fuzz/artifacts/s_algebra/crash-21545b7632981ae5e4b4bb6d6fd0808367c26c5f
+
+Output of `std::fmt::Debug`:
+
+        (
+            -4,
+            64,
+        )
+
+Reproduce with:
+
+        cargo fuzz run s_algebra fuzz/artifacts/s_algebra/crash-21545b7632981ae5e4b4bb6d6fd0808367c26c5f
+
+Minimize test case with:
+
+        cargo fuzz tmin s_algebra fuzz/artifacts/s_algebra/crash-21545b7632981ae5e4b4bb6d6fd0808367c26c5f
+
+────────────────────────────────────────────────────────────────────────────────
+
+
+Failing input:
+
+        fuzz/artifacts/s_ifStmt/crash-9fa4d42d8734b496a4c13519e201b803475a92cc
+
+Output of `std::fmt::Debug`:
+
+        (
+            4,
+            34,
+        )
+
+Reproduce with:
+
+        cargo fuzz run s_ifStmt fuzz/artifacts/s_ifStmt/crash-9fa4d42d8734b496a4c13519e201b803475a92cc
+
+Minimize test case with:
+
+        cargo fuzz tmin s_ifStmt fuzz/artifacts/s_ifStmt/crash-9fa4d42d8734b496a4c13519e201b803475a92cc
+
+────────────────────────────────────────────────────────────────────────────────
+
+Failing input:
+
+        fuzz/artifacts/s_loop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+
+Output of `std::fmt::Debug`:
+
+        10
+
+Reproduce with:
+
+        cargo fuzz run s_loop fuzz/artifacts/s_loop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+
+Minimize test case with:
+
+        cargo fuzz tmin s_loop fuzz/artifacts/s_loop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+
+────────────────────────────────────────────────────────────────────────────────
+
+
+Failing input:
+
+        fuzz/artifacts/s2_ifStmt/crash-bdfb15d01dbd9f251552b4fe23673519f633dfd1
+
+Output of `std::fmt::Debug`:
+
+        (
+            -1,
+            56,
+        )
+
+Reproduce with:
+
+        cargo fuzz run s2_ifStmt fuzz/artifacts/s2_ifStmt/crash-bdfb15d01dbd9f251552b4fe23673519f633dfd1
+
+Minimize test case with:
+
+        cargo fuzz tmin s2_ifStmt fuzz/artifacts/s2_ifStmt/crash-bdfb15d01dbd9f251552b4fe23673519f633dfd1
+
+────────────────────────────────────────────────────────────────────────────────

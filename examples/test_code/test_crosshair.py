@@ -1,4 +1,3 @@
-
 def s_algebra(x: int, y: int) -> int:
   '''
   post: __return__ != y
@@ -44,15 +43,20 @@ def s_ifStmt(x:int, y:int) -> int:
     y = 0
   return y
 
-def b2_ifStmt(x:int, y:int) -> int:
-  '''
-  post: y != x + 1
-  '''
-  if x < 5:
-    if x >= 5:
-      y = x
-    y = y + 1
-  return 0
+def b(x: int, y: int) -> int:
+  """
+  post: __return__ != 8
+  """
+  x = y * 2
+  if x == 6:
+     y = y + 3
+     if y > 2:
+       y = y + 2
+  else:
+    y = y + 4
+
+  return y
+
 
 def s2_ifStmt(x:int, y:int) -> int:
   """
@@ -90,27 +94,25 @@ def b_loop(n:int) -> int:
 
 def b_nestedIfLoop(a:int) -> int:
   '''
-  post: __return__  != 0
+  post: __return__  == 0
   '''
   i = 0
   j = 3
   while i < 3:
     i = i + 1
-    if i == 3 {
+    if i == 3:
       j = 0
-    }
   return j
 
-def b_nestedIfLoop(a:int) -> int:
+def s_nestedIfLoop(a:int) -> int:
   '''
-  post: __return__  != 0
+  post: __return__  == 0
   '''
   i = 0
   j = 3
   while i < 3:
-    if i == 3 {
+    if i == 3:
       j = 0
-    }
     i = i + 1
   return j
       

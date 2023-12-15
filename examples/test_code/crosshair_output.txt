@@ -1,4 +1,34 @@
-CROSSHAIR
+-----------------------------------------------------------------------------------------------------------------------
+←[94m  Analyzing 1 files.←[0m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -----------------------------------------------------------------------------------------------------------------------
   File "C:\Users\catne\Desktop\school\703\crosshair\lib\site-packages\crosshair\core.py", line 1435, in attempt_call
     __return__ = unenforced_fn(*bargs, **bkwargs)
@@ -60,19 +90,19 @@ when calling s_ifStmt(0, 0) (which returns 0)
 ←[91mI was able to make your postcondition return False.←[0m
 C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:48:
 |
-|def b2_ifStmt(x:int, y:int) -> int:
-|  '''
->←[93m  post: y != x + 1
-←[0m|  '''
-|  if x < 5:
-|    if x >= 5:
+|def b(x: int, y: int) -> int:
+|  """
+>←[93m  post: __return__ != 8
+←[0m|  """
+|  x = y * 2
+|  if x == 6:
 
 false
-when calling b2_ifStmt(0, 1) (which returns 0)
+when calling b(0, 3) (which returns 8)
 -----------------------------------------------------------------------------------------------------------------------
 
 ←[91mI was able to make your postcondition return False.←[0m
-C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:58:
+C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:63:
 |
 |def s2_ifStmt(x:int, y:int) -> int:
 |  """
@@ -86,7 +116,7 @@ when calling s2_ifStmt(0, 5) (which returns 10)
 -----------------------------------------------------------------------------------------------------------------------
 
 ←[91mI was able to make your postcondition return False.←[0m
-C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:81:
+C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:86:
 |def b_loop(n:int) -> int:
 |  '''
 |  pre: n > 0
@@ -100,9 +130,9 @@ when calling b_loop(2) (which returns 3)
 -----------------------------------------------------------------------------------------------------------------------
 
 ←[91mI was able to make your postcondition return False.←[0m
-C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:104:
+C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:109:
 |
-|def b_nestedIfLoop(a:int) -> int:
+|def s_nestedIfLoop(a:int) -> int:
 |  '''
 >←[93m  post: __return__  == 0
 ←[0m|  '''
@@ -110,11 +140,11 @@ C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:104:
 |  j = 3
 
 false
-when calling b_nestedIfLoop(0) (which returns 3)
+when calling s_nestedIfLoop(0) (which returns 3)
 -----------------------------------------------------------------------------------------------------------------------
 
 ←[91mI was able to make your postcondition return False.←[0m
-C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:116:
+C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:121:
 |
 |def b_infLoop(n:int) -> int:
 |  '''
@@ -125,103 +155,5 @@ C:\Users\catne\Desktop\school\703\test_code\test_crosshair.py:116:
 
 false
 when calling b_infLoop(-1) (which returns 0)
-
-HAYBALE
-Inputs for which s_algebra returns 0: [I32(0), I32(2147483644)]
-Inputs for which b_algebra returns 0: [I32(0), I32(-1073741828)]
-b_ifStmt can never return 0
-Inputs for which s_ifStmt returns 0: [I32(4), I32(0)]
-Inputs for which s_loop returns 0: [I32(-2147483639)]
-Inputs for which b_loop returns 0: [I32(-2147483640)]
-Inputs for which b2_loop returns 0: [I32(-1073741824)]
-Inputs for which b_nestedIfLoop returns 0: [I32(0)]
-s_nestedIfLoop can never return 0
-
-────────────────────────────────────────────────────────────────────────────────
-
-Failing input:
-
-        fuzz/artifacts/b_infLoop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
-
-Output of `std::fmt::Debug`:
-
-        (
-            -10,
-            10,
-        )
-
-Reproduce with:
-
-        cargo fuzz run b_algebra fuzz/artifacts/b_algebra/crash-ca118198225f629c1fe2fda1c76234fa6024253e
-
-Minimize test case with:
-
-        cargo fuzz tmin b_algebra fuzz/artifacts/b_algebra/crash-ca118198225f629c1fe2fda1c76234fa6024253e
-
-────────────────────────────────────────────────────────────────────────────────
-
-Error: Fuzz target exited with exit status: 77
-Output of `std::fmt::Debug`:
-
-        (
-            0,
-            0,
-        )
-
-Reproduce with:
-
-        cargo fuzz run b_ifStmt fuzz/artifacts/b_ifStmt/crash-e4faefa4502eaf582fb184a2300122f40de097af
-
-Minimize test case with:
-
-        cargo fuzz tmin b_ifStmt fuzz/artifacts/b_ifStmt/crash-e4faefa4502eaf582fb184a2300122f40de097af
-
-────────────────────────────────────────────────────────────────────────────────
-
-Error: Fuzz target exited with exit status: 77
-Output of `std::fmt::Debug`:
-
-        (
-            -114,
-            -114,
-        )
-
-Reproduce with:
-
-        cargo fuzz run b2_ifStmt fuzz/artifacts/b2_ifStmt/crash-0e6e44fdf2d9636d2f49b3cc20a2375be45feef9
-
-Minimize test case with:
-
-        cargo fuzz tmin b2_ifStmt fuzz/artifacts/b2_ifStmt/crash-0e6e44fdf2d9636d2f49b3cc20a2375be45feef9
-
-────────────────────────────────────────────────────────────────────────────────
-
-Error: Fuzz target exited with exit status: 77
-Output of `std::fmt::Debug`:
-
-        91
-
-Reproduce with:
-
-        cargo fuzz run b_loop fuzz/artifacts/b_loop/crash-1e5c2f367f02e47a8c160cda1cd9d91decbac441
-
-Minimize test case with:
-
-        cargo fuzz tmin b_loop fuzz/artifacts/b_loop/crash-1e5c2f367f02e47a8c160cda1cd9d91decbac441
-
-────────────────────────────────────────────────────────────────────────────────
-
-Error: Fuzz target exited with exit status: 77
-Output of `std::fmt::Debug`:
-
-        10
-
-Reproduce with:
-
-        cargo fuzz run b_infLoop fuzz/artifacts/b_infLoop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
-
-Minimize test case with:
-
-        cargo fuzz tmin b_infLoop fuzz/artifacts/b_infLoop/crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
-
-────────────────────────────────────────────────────────────────────────────────
+-------------------------------------------------
+←[94m  Analyzed 399 paths in "test_code".       ←[0m
